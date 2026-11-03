@@ -87,7 +87,7 @@ class DriveTracker(context: Context, private val prefs: Prefs) {
         try {
             val providers = lm.getProviders(true)
             for (p in providers) {
-                lm.getLastKnownLocation(p)?.let { if (location == null) setLocation(it) }
+                lm.getLastKnownLocation(p)?.let { if (location == null) rememberLocation(it) }
             }
             if (LocationManager.GPS_PROVIDER in lm.allProviders) {
                 lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, listener, Looper.getMainLooper())
@@ -121,7 +121,7 @@ class DriveTracker(context: Context, private val prefs: Prefs) {
         }
     }
 
-    private fun setLocation(l: Location) {
+    private fun rememberLocation(l: Location) {
         location = l
         prefs.lastLat = l.latitude.toFloat()
         prefs.lastLon = l.longitude.toFloat()
@@ -130,7 +130,7 @@ class DriveTracker(context: Context, private val prefs: Prefs) {
     private fun onFix(l: Location) {
         if (l.provider != LocationManager.GPS_PROVIDER) {
             // position réseau : utile pour la météo et le soleil, pas pour la vitesse
-            if (!gpsFix) setLocation(l)
+            if (!gpsFix) rememberLocation(l)
             return
         }
         val now = SystemClock.elapsedRealtime()
