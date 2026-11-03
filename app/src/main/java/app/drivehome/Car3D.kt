@@ -40,26 +40,37 @@ object Car3D {
     fun exists(ctx: Context): Boolean = file(ctx).let { it.exists() && it.length() > 20 }
 
     /** Copie le fichier choisi par l'utilisateur ; vérifie l'en-tête « glTF ». */
-    fun import(ctx: Context, uri: Uri): String? = try {
-        val tmp = File(ctx.filesDir, "car_model.tmp")
-        ctx.contentResolver.openInputStream(uri)?.use { inp -> tmp.outputStream().use { inp.copyTo(it) } }
-            ?: return "Fichier illisible"
-        val head = tmp.inputStream().use { s -> ByteArray(4).also { s.read(it) } }
-        if (String(head, Charsets.US_ASCII) != "glTF") {
-            tmp.delete()
-            "Ce n'est pas un fichier .glb (glTF binaire)"
-        } else {
-            val dest = file(ctx)
-            dest.delete()
-            tmp.renameTo(dest)
-            null
+    fun import(ctx: Context, uri: Uri): String? {
+        return try {
+            val tmp = File(ctx.filesDir, "car_model.tmp")
+            val input = ctx.contentResolver.openInputStream(uri) ?: return "Fichier illisible"
+            input.use { inp -> tmp.outputStream().use { inp.copyTo(it) } }
+            val head = tmp.inputStream().use { st -> ByteArray(4).also { st.read(it) } }
+            if (String(head, Charsets.US_ASCII) != "glTF") {
+                tmp.delete()
+                "Ce n'est pas un fichier .glb (glTF binaire)"
+            } else {
+                val dest = file(ctx)
+                dest.delete()
+                tmp.renameTo(dest)
+                null
+            }
+        } catch (e: Exception) {
+            "Import impossible : ${e.message}"
         }
-    } catch (e: Exception) {
-        "Import impossible : ${e.message}"
     }
 
     fun delete(ctx: Context) {
         file(ctx).delete()
+    }
+
+    /** Devine la matière de carrosserie d'après son nom. */
+    fun guessPaint(names: List<String>): String? {
+        val bad = listOf("glass", "window", "tire", "tyre", "rim", "wheel", "light", "lamp", "chrome", "interior", "rubber", "plate", "black")
+        val good = listOf("carpaint", "paint", "body", "lack", "karoser", "exterior", "color", "colour", "car")
+        val ok = names.filter { n -> bad.none { n.lowercase(Locale.ROOT).contains(it) } }
+        for (g in good) ok.firstOrNull { it.lowercase(Locale.ROOT).contains(g) }?.let { return it }
+        return null
     }
 
     /** Mots-clés usuels des modèles pour deviner chaque pièce. */
@@ -89,6 +100,8 @@ fun Car3DView(
     modifier: Modifier = Modifier,
     interactive: Boolean = true,
     onPartsListed: (List<String>) -> Unit = {},
+    onMaterialsListed: (List<String>) -> Unit = {},
+    paint: androidx.compose.ui.graphics.Color? = null,
     onError: (String) -> Unit = {},
 ) {
     val ctx = LocalContext.current
@@ -121,6 +134,24 @@ fun Car3DView(
         modelNode?.nodes?.mapNotNull { nd -> nd.name?.let { it to (nd to nd.rotation) } }?.toMap() ?: emptyMap()
     }
     LaunchedEffect(parts) { onPartsListed(parts.keys.sorted()) }
+
+    // Peinture : teinte la (ou les) matière(s) de carrosserie
+    val materials = remember(modelNode) {
+        modelNode?.modelInstance?.materialInstances?.toList() ?: emptyList()
+    }
+    LaunchedEffect(materials) { onMaterialsListed(materials.mapNotNull { it.name }.distinct().sorted()) }
+    val chosenPaint = prefs.paintMaterial
+    LaunchedEffect(materials, chosenPaint, paint) {
+        if (paint == null || !prefs.repaint) return@LaunchedEffect
+        val target = chosenPaint.ifEmpty { Car3D.guessPaint(materials.mapNotNull { it.name }) ?: "" }
+        materials.filter { it.name == target }.forEach { mi ->
+            try {
+                mi.setParameter("baseColorFactor", paint.red, paint.green, paint.blue, 1f)
+            } catch (e: Throwable) {
+                // matière sans ce paramètre
+            }
+        }
+    }
 
     val spec = tween<Float>(700)
     val fl by animateFloatAsState(if (doors.fl) 1f else 0f, spec, label = "fl3d")

@@ -176,6 +176,9 @@ class Prefs(context: Context) {
     /** Modèle 3D importé : on l'utilise à la place du dessin. */
     var use3d by BoolPref("use3d", true)
     var car3dOnHome by BoolPref("car3dOnHome", true)
+    /** Repeindre la carrosserie du modèle 3D avec la couleur choisie. */
+    var repaint by BoolPref("repaint", true)
+    var paintMaterial by StrPref("paintMaterial", "")
     /** Change à chaque import pour recharger le modèle. */
     var car3dVersion by LongPref("car3dVersion", 0L)
     private var partsRaw by StrPref("carParts", "")

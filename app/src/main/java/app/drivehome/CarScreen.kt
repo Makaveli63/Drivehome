@@ -231,6 +231,8 @@ fun CarVisual(state: AppState, modifier: Modifier, interactive: Boolean, onParts
                 Modifier.fillMaxSize(),
                 interactive = interactive,
                 onPartsListed = onPartsListed,
+                onMaterialsListed = { CarModelInfo.materials = it },
+                paint = state.carColor(),
                 onError = { Apps.toast(ctx, it) },
             )
             // mini-schéma des ouvrants, toujours lisible
@@ -512,6 +514,11 @@ fun DoorAlertBanner(state: AppState) {
 // Modèle 3D : import + association des portes
 // ---------------------------------------------------------------------------
 
+/** Matières du modèle chargé (pour le choix de la carrosserie). */
+object CarModelInfo {
+    var materials by mutableStateOf<List<String>>(emptyList())
+}
+
 @Composable
 private fun Model3DPanel(state: AppState, partNames: List<String>) {
     val ctx = LocalContext.current
@@ -519,6 +526,7 @@ private fun Model3DPanel(state: AppState, partNames: List<String>) {
     val pf = state.prefs
     val has3d = remember(pf.car3dVersion) { Car3D.exists(ctx) }
     var pickFor by remember { mutableStateOf<CarPart?>(null) }
+    var pickPaint by remember { mutableStateOf(false) }
     val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -562,6 +570,37 @@ private fun Model3DPanel(state: AppState, partNames: List<String>) {
                 }
             }
             if (has3d && pf.use3d) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Repeindre la carrosserie", color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.Switch(checked = pf.repaint, onCheckedChange = {
+                        pf.repaint = it
+                        pf.car3dVersion = System.currentTimeMillis() // recharge les couleurs d'origine
+                    })
+                }
+                if (pf.repaint) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CAR_COLORS.forEachIndexed { i, c ->
+                            Swatch(c.color, pf.carColor == i, { pf.carColor = i })
+                        }
+                    }
+                    val auto = Car3D.guessPaint(CarModelInfo.materials)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Matière de la carrosserie", color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        Text(
+                            pf.paintMaterial.ifEmpty { auto?.let { "Auto : $it" } ?: "À choisir" },
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.width(200.dp).clip(RoundedCornerShape(50)).clickable { pickPaint = true }.padding(8.dp),
+                        )
+                    }
+                    Text(
+                        "Si la couleur ne change pas, essaie une autre matière : certains modèles peignent la carrosserie dans une texture.",
+                        color = p.sub,
+                        fontSize = 12.sp,
+                    )
+                }
                 Text(
                     "Pièces mobiles : choisis quelle partie du modèle correspond à chaque porte " +
                         "(seulement si le modèle a des portes séparées). Utilise les boutons de test pour vérifier.",
@@ -591,6 +630,38 @@ private fun Model3DPanel(state: AppState, partNames: List<String>) {
                 }
             }
         }
+    }
+
+    if (pickPaint) {
+        AlertDialog(
+            onDismissRequest = { pickPaint = false },
+            title = { Text("Matière de la carrosserie") },
+            text = {
+                LazyColumn(Modifier.heightIn(max = 380.dp)) {
+                    item {
+                        Text(
+                            "Détection automatique",
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                pf.paintMaterial = ""
+                                pf.car3dVersion = System.currentTimeMillis()
+                                pickPaint = false
+                            }.padding(vertical = 10.dp),
+                        )
+                    }
+                    items(CarModelInfo.materials) { n ->
+                        Text(
+                            n,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                pf.paintMaterial = n
+                                pf.car3dVersion = System.currentTimeMillis()
+                                pickPaint = false
+                            }.padding(vertical = 10.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pickPaint = false }) { Text("Fermer") } },
+        )
     }
 
     val target = pickFor
