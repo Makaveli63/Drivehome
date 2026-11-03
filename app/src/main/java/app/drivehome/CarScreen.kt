@@ -224,7 +224,9 @@ fun CarVisual(state: AppState, modifier: Modifier, interactive: Boolean, onParts
     val ctx = LocalContext.current
     val pf = state.prefs
     val has3d = remember(pf.car3dVersion) { Car3D.exists(ctx) }
-    if (pf.use3d && has3d) {
+    if (pf.carView == 3) {
+        CarPhotosView(modifier, interactive)
+    } else if (pf.use3d && has3d) {
         Box(modifier) {
             Car3DView(
                 state.car.doors,
@@ -304,6 +306,7 @@ private fun CarHero(state: AppState, modifier: Modifier, onPartsListed: (List<St
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill("Mes photos", pf.carView == 3, { pf.carView = 3 })
                 Pill("Profil", pf.carView == 0, { pf.carView = 0 })
                 Pill("Vue 3/4 dessus", pf.carView == 1, { pf.carView = 1 })
                 Pill(if (pf.carPhotoUri.isEmpty()) "Ma photo…" else "Ma photo", pf.carView == 2, {
@@ -328,7 +331,7 @@ private fun CarHero(state: AppState, modifier: Modifier, onPartsListed: (List<St
             )
             Text("Source : ${state.car.doorsSource}", color = p.sub, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
-            Row(
+            if (pf.carView != 3) Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -541,7 +544,15 @@ fun DoorAlertBanner(state: AppState) {
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CarView(d, state.carColor(), Modifier.width(90.dp).height(90.dp), rotatable = false, initialSpin = 0f, tilt = 35f)
+            if (state.prefs.carView == 3) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(CAR_SHOTS[0].first),
+                    contentDescription = null,
+                    modifier = Modifier.width(120.dp).height(70.dp),
+                )
+            } else {
+                CarView(d, state.carColor(), Modifier.width(90.dp).height(90.dp), rotatable = false, initialSpin = 0f, tilt = 35f)
+            }
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(state.prefs.carName.ifBlank { "Ma voiture" }, color = Color(0xFFB0B0B8), fontSize = 13.sp)
@@ -774,6 +785,60 @@ fun CarPhoto(state: AppState, modifier: Modifier) {
                     .background(Color(0xCC1C1C1E)),
             ) {
                 CarView(d, state.carColor(), Modifier.width(90.dp).height(90.dp), tilt = 0f, initialSpin = 0f, rotatable = false)
+            }
+        }
+    }
+}
+
+/** Photos détourées de la voiture du propriétaire (Passat Variant B8 blanche). */
+val CAR_SHOTS = listOf(
+    R.drawable.car_avant34d to "3/4 avant",
+    R.drawable.car_face to "Avant",
+    R.drawable.car_arriere34 to "3/4 arrière",
+    R.drawable.car_arriere to "Arrière",
+)
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun CarPhotosView(modifier: Modifier, interactive: Boolean) {
+    val p = LocalPalette.current
+    @Composable
+    fun Shot(res: Int, m: Modifier) {
+        Box(m, contentAlignment = Alignment.Center) {
+            // ombre au sol
+            Canvas(Modifier.fillMaxSize()) {
+                drawOval(
+                    Color.Black.copy(alpha = 0.45f),
+                    topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.80f),
+                    size = androidx.compose.ui.geometry.Size(size.width * 0.8f, size.height * 0.10f),
+                )
+            }
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(res),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(6.dp),
+            )
+        }
+    }
+    if (!interactive) {
+        Shot(CAR_SHOTS[0].first, modifier)
+        return
+    }
+    val pager = androidx.compose.foundation.pager.rememberPagerState(pageCount = { CAR_SHOTS.size })
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        androidx.compose.foundation.pager.HorizontalPager(state = pager, modifier = Modifier.weight(1f).fillMaxWidth()) { i ->
+            Shot(CAR_SHOTS[i].first, Modifier.fillMaxSize())
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            CAR_SHOTS.forEachIndexed { i, (_, label) ->
+                Text(
+                    label,
+                    color = if (i == pager.currentPage) p.text else p.sub,
+                    fontSize = 12.sp,
+                    fontWeight = if (i == pager.currentPage) FontWeight.Bold else FontWeight.Normal,
+                )
+                if (i < CAR_SHOTS.lastIndex) Text("·", color = p.sub, fontSize = 12.sp)
             }
         }
     }

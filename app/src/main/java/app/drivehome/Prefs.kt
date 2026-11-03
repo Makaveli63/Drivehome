@@ -164,8 +164,8 @@ class Prefs(context: Context) {
     // ---- Ma voiture -----------------------------------------------------------
 
     var carName by StrPref("carName", "Passat Variant")
-    /** Affichage : 0 = profil (B8), 1 = vue 3/4 dessus, 2 = ma photo. */
-    var carView by IntPref("carView", 0)
+    /** Affichage : 3 = mes photos détourées (défaut), 0 = dessin de profil, 1 = vue 3/4 dessus, 2 = photo choisie. */
+    var carView by IntPref("carViewMode", 3)
     var carPhotoUri by StrPref("carPhotoUri", "")
     var carPlate by StrPref("carPlate", "")
     /** 0 = diesel, 1 = essence, 2 = hybride, 3 = électrique. */
