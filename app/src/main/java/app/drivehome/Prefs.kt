@@ -173,6 +173,30 @@ class Prefs(context: Context) {
     var obdAuto by BoolPref("obdAuto", true)
     var doorVoice by BoolPref("doorVoice", true)
 
+    /** Modèle 3D importé : on l'utilise à la place du dessin. */
+    var use3d by BoolPref("use3d", true)
+    var car3dOnHome by BoolPref("car3dOnHome", true)
+    /** Change à chaque import pour recharger le modèle. */
+    var car3dVersion by LongPref("car3dVersion", 0L)
+    private var partsRaw by StrPref("carParts", "")
+
+    private fun partsMap(): Map<String, String> = partsRaw.split("\n").mapNotNull {
+        val i = it.indexOf('=')
+        if (i <= 0) null else it.substring(0, i) to it.substring(i + 1)
+    }.toMap()
+
+    private fun putPart(key: String, value: String) {
+        val m = partsMap().toMutableMap()
+        if (value.isEmpty()) m.remove(key) else m[key] = value
+        partsRaw = m.entries.joinToString("\n") { "${it.key}=${it.value}" }
+    }
+
+    /** Nom de la pièce du modèle 3D associée (vide = détection automatique). */
+    fun partNode(p: CarPart): String = partsMap()[p.key].orEmpty()
+    fun setPartNode(p: CarPart, name: String) = putPart(p.key, name)
+    fun partInvert(p: CarPart): Boolean = partsMap()[p.key + "_inv"] == "1"
+    fun setPartInvert(p: CarPart, inv: Boolean) = putPart(p.key + "_inv", if (inv) "1" else "")
+
     // ---- Dock -------------------------------------------------------------------
 
     var dockPhone by BoolPref("dockPhone", true)

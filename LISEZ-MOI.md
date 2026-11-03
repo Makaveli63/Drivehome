@@ -78,6 +78,12 @@ vocale, et un avertissement si un ouvrant est ouvert en roulant. Plaque d'immatr
   `app.drivehome.CAR_STATUS` (extras `door_fl`, `door_fr`, `door_rl`, `door_rr`, `trunk`, `hood`,
   `fuel`, `range_km`, `temp_out`). Test : `adb shell am broadcast -a app.drivehome.CAR_STATUS --ez door_fl true`
 
+**Vrai modèle 3D** — Ma voiture → « Modèle 3D de la voiture » → **Importer un .glb**.
+Rendu 3D réaliste (moteur Filament), rotation et zoom au doigt. Si le modèle a des portes
+séparées, elles pivotent vraiment à l'ouverture (association automatique ou manuelle des pièces).
+Où trouver une Passat B8 Variant : Sketchfab (filtre « Downloadable »), CGTrader, RenderHub —
+vérifie la licence et choisis le format **glTF binaire (.glb)**.
+
 **Tuiles** — sur l'accueil, « ✎ Modifier » : ajouter, retirer, déplacer et redimensionner chaque
 tuile (largeur × hauteur), grille réglable (colonnes × lignes).
 

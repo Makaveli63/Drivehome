@@ -99,7 +99,11 @@ fun CarCard(state: AppState, modifier: Modifier) {
     CardShell(modifier.clickable { state.screen = Screen.Car }, tint = if (d.anyOpen()) Color(0x33FF9F0A) else Color.Transparent) {
         Column(Modifier.fillMaxSize()) {
             CardHeader(state.prefs.carName.ifBlank { "Ma voiture" })
-            CarView(d, state.carColor(), Modifier.weight(1f).fillMaxWidth(), rotatable = false)
+            if (state.prefs.car3dOnHome) {
+                CarVisual(state, Modifier.weight(1f).fillMaxWidth(), interactive = false)
+            } else {
+                CarView(d, state.carColor(), Modifier.weight(1f).fillMaxWidth(), rotatable = false)
+            }
             Text(
                 doorSummary(d),
                 color = if (d.anyOpen()) Color(0xFFFF9F0A) else p.sub,
@@ -185,30 +189,69 @@ fun Gauge(label: String, value: Int?, max: Int, unit: String, modifier: Modifier
 
 @Composable
 fun CarScreen(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
+    var partNames by remember { mutableStateOf<List<String>>(emptyList()) }
     BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp)) {
         val wide = maxWidth > maxHeight
         if (wide) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                CarHero(state, Modifier.weight(1.1f).fillMaxHeight())
+                CarHero(state, Modifier.weight(1.1f).fillMaxHeight()) { partNames = it }
                 Column(
                     Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) { CarPanels(state, onRequestPermissions) }
+                ) {
+                    CarPanels(state, onRequestPermissions)
+                    Model3DPanel(state, partNames)
+                }
             }
         } else {
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                CarHero(state, Modifier.fillMaxWidth().height(420.dp))
+                CarHero(state, Modifier.fillMaxWidth().height(420.dp)) { partNames = it }
                 CarPanels(state, onRequestPermissions)
+                Model3DPanel(state, partNames)
             }
         }
     }
 }
 
+/** Voiture : vrai modèle 3D si importé, sinon le dessin. */
 @Composable
-private fun CarHero(state: AppState, modifier: Modifier) {
+fun CarVisual(state: AppState, modifier: Modifier, interactive: Boolean, onPartsListed: (List<String>) -> Unit = {}) {
+    val ctx = LocalContext.current
+    val pf = state.prefs
+    val has3d = remember(pf.car3dVersion) { Car3D.exists(ctx) }
+    if (pf.use3d && has3d) {
+        Box(modifier) {
+            Car3DView(
+                state.car.doors,
+                pf,
+                pf.car3dVersion,
+                Modifier.fillMaxSize(),
+                interactive = interactive,
+                onPartsListed = onPartsListed,
+                onError = { Apps.toast(ctx, it) },
+            )
+            // mini-schéma des ouvrants, toujours lisible
+            if (state.car.doors.anyOpen()) {
+                CarView(
+                    state.car.doors,
+                    state.carColor(),
+                    Modifier.align(Alignment.TopStart).width(70.dp).height(70.dp),
+                    tilt = 0f,
+                    initialSpin = 0f,
+                    rotatable = false,
+                )
+            }
+        }
+    } else {
+        CarView(state.car.doors, state.carColor(), modifier, rotatable = interactive)
+    }
+}
+
+@Composable
+private fun CarHero(state: AppState, modifier: Modifier, onPartsListed: (List<String>) -> Unit) {
     val p = LocalPalette.current
     val pf = state.prefs
     val d = state.car.doors
@@ -225,8 +268,8 @@ private fun CarHero(state: AppState, modifier: Modifier) {
                 }
                 LicensePlate(pf.carPlate)
             }
-            CarView(d, state.carColor(), Modifier.weight(1f).fillMaxWidth())
-            Text("Glisse pour faire tourner la voiture", color = p.sub, fontSize = 12.sp)
+            CarVisual(state, Modifier.weight(1f).fillMaxWidth(), interactive = true, onPartsListed = onPartsListed)
+            Text("Glisse pour faire tourner la voiture (pince pour zoomer en 3D)", color = p.sub, fontSize = 12.sp)
             Spacer(Modifier.height(6.dp))
             Text(
                 doorSummary(d),
@@ -462,5 +505,122 @@ fun DoorAlertBanner(state: AppState) {
                 )
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Modèle 3D : import + association des portes
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun Model3DPanel(state: AppState, partNames: List<String>) {
+    val ctx = LocalContext.current
+    val p = LocalPalette.current
+    val pf = state.prefs
+    val has3d = remember(pf.car3dVersion) { Car3D.exists(ctx) }
+    var pickFor by remember { mutableStateOf<CarPart?>(null) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            val err = Car3D.import(ctx, uri)
+            if (err != null) {
+                Apps.toast(ctx, err)
+            } else {
+                pf.use3d = true
+                pf.car3dVersion = System.currentTimeMillis()
+                Apps.toast(ctx, "Modèle 3D importé")
+            }
+        }
+    }
+
+    CardShell(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            CardHeader("Modèle 3D de la voiture")
+            Text(
+                if (has3d) "Modèle importé ✓ — glisse pour tourner, pince pour zoomer."
+                else "Importe un vrai modèle 3D de ta voiture au format .glb (Sketchfab, CGTrader, RenderHub…). " +
+                    "Copie-le sur une clé USB ou dans Téléchargements, puis touche « Importer ».",
+                color = p.sub,
+                fontSize = 13.sp,
+            )
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill(if (has3d) "Remplacer le modèle" else "Importer un .glb", !has3d, {
+                    try {
+                        launcher.launch(arrayOf("*/*"))
+                    } catch (e: Exception) {
+                        Apps.toast(ctx, "Aucun sélecteur de fichiers")
+                    }
+                })
+                if (has3d) {
+                    Pill(if (pf.use3d) "Afficher : 3D" else "Afficher : dessin", pf.use3d, { pf.use3d = !pf.use3d })
+                    Pill(if (pf.car3dOnHome) "3D sur l'accueil : oui" else "3D sur l'accueil : non", false, { pf.car3dOnHome = !pf.car3dOnHome })
+                    Pill("Supprimer", false, {
+                        Car3D.delete(ctx)
+                        pf.car3dVersion = System.currentTimeMillis()
+                    })
+                }
+            }
+            if (has3d && pf.use3d) {
+                Text(
+                    "Pièces mobiles : choisis quelle partie du modèle correspond à chaque porte " +
+                        "(seulement si le modèle a des portes séparées). Utilise les boutons de test pour vérifier.",
+                    color = p.sub,
+                    fontSize = 13.sp,
+                )
+                CarPart.entries.forEach { part ->
+                    val chosen = pf.partNode(part)
+                    val auto = Car3D.guess(part, partNames)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(part.label, color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        Text(
+                            chosen.ifEmpty { auto?.let { "Auto : $it" } ?: "Aucune" },
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.width(170.dp).clip(RoundedCornerShape(50)).clickable { pickFor = part }.padding(8.dp),
+                        )
+                        Text(
+                            if (pf.partInvert(part)) "⇄ inversé" else "⇄",
+                            color = p.sub,
+                            fontSize = 13.sp,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).clickable { pf.setPartInvert(part, !pf.partInvert(part)) }.padding(8.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    val target = pickFor
+    if (target != null) {
+        AlertDialog(
+            onDismissRequest = { pickFor = null },
+            title = { Text(target.label) },
+            text = {
+                LazyColumn(Modifier.heightIn(max = 380.dp)) {
+                    item {
+                        Text(
+                            "Détection automatique",
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                pf.setPartNode(target, "")
+                                pickFor = null
+                            }.padding(vertical = 10.dp),
+                        )
+                    }
+                    items(partNames) { n ->
+                        Text(
+                            n,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                pf.setPartNode(target, n)
+                                pickFor = null
+                            }.padding(vertical = 10.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pickFor = null }) { Text("Fermer") } },
+        )
     }
 }

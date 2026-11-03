@@ -10,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "app.drivehome"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "2.1"
+        versionCode = 4
+        versionName = "2.2"
     }
 
     // Clé de signature fixe (optionnelle) fournie par les secrets GitHub :
@@ -54,6 +54,10 @@ android {
         compose = true
     }
 
+    packaging {
+        resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1")
+    }
+
     lint {
         checkReleaseBuilds = false
         abortOnError = false
@@ -71,4 +75,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // Moteur 3D (Filament) pour afficher le vrai modèle de la voiture
+    implementation("io.github.sceneview:sceneview:2.2.1")
 }
