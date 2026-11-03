@@ -226,7 +226,7 @@ fun CarVisual(state: AppState, modifier: Modifier, interactive: Boolean, onParts
     val has3d = remember(pf.car3dVersion) { Car3D.exists(ctx) }
     if (pf.carView == 3) {
         CarPhotosView(modifier, interactive)
-    } else if (pf.use3d && has3d) {
+    } else if ((pf.carView == 4 || pf.use3d) && has3d) {
         Box(modifier) {
             Car3DView(
                 state.car.doors,
@@ -307,6 +307,9 @@ private fun CarHero(state: AppState, modifier: Modifier, onPartsListed: (List<St
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill("Mes photos", pf.carView == 3, { pf.carView = 3 })
+                if (remember(pf.car3dVersion) { Car3D.exists(ctxHero) }) {
+                    Pill("Modèle 3D", pf.carView == 4, { pf.carView = 4 })
+                }
                 Pill("Profil", pf.carView == 0, { pf.carView = 0 })
                 Pill("Vue 3/4 dessus", pf.carView == 1, { pf.carView = 1 })
                 Pill(if (pf.carPhotoUri.isEmpty()) "Ma photo…" else "Ma photo", pf.carView == 2, {
@@ -593,6 +596,7 @@ private fun Model3DPanel(state: AppState, partNames: List<String>) {
                 Apps.toast(ctx, err)
             } else {
                 pf.use3d = true
+                pf.carView = 4
                 pf.car3dVersion = System.currentTimeMillis()
                 Apps.toast(ctx, "Modèle 3D importé")
             }
