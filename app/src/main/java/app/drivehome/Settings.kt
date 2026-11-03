@@ -165,14 +165,67 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
             SwitchRow("Afficher les secondes", pf.showSeconds) { pf.showSeconds = it }
         }
 
+        // ---------------------------------------------------------- Ma voiture
+        Section("Ma voiture") {
+            OutlinedTextField(
+                value = pf.carName,
+                onValueChange = { pf.carName = it },
+                label = { Text("Nom affiché") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = pf.carPlate,
+                    onValueChange = { pf.carPlate = it.uppercase().take(12) },
+                    label = { Text("Immatriculation") },
+                    placeholder = { Text("AB-123-CD") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                LicensePlate(pf.carPlate)
+            }
+            Label("Motorisation")
+            ScrollRow {
+                listOf("Diesel", "Essence", "Hybride", "Électrique").forEachIndexed { i, n ->
+                    Pill(n, pf.carFuel == i, { pf.carFuel = i })
+                }
+            }
+            Label("Couleur de la voiture")
+            ScrollRow {
+                CAR_COLORS.forEachIndexed { i, c ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Swatch(c.color, pf.carColor == i, { pf.carColor = i })
+                        Text(c.name, color = p.sub, fontSize = 11.sp)
+                    }
+                }
+            }
+            SwitchRow("Annoncer à voix haute l'ouverture des portes / du coffre", pf.doorVoice) { pf.doorVoice = it }
+            SwitchRow("Connexion automatique au boîtier OBD", pf.obdAuto) { pf.obdAuto = it }
+            ChoiceRow("Écran « Ma voiture » (OBD, diagnostic, CANbus)", "Ouvrir") { state.screen = Screen.Car }
+        }
+
         // -------------------------------------------------------------- Accueil
-        Section("Cartes de l'accueil") {
-            Label("Active, désactive et réordonne les cartes. Les 3 premières forment le tableau de bord ; glisse vers la gauche pour les pages suivantes.")
+        Section("Tuiles de l'accueil") {
+            Label("Astuce : sur l'accueil, touche « ✎ Modifier » pour redimensionner, déplacer, ajouter ou retirer les tuiles directement.")
+            Stepper("Colonnes (paysage)", "${pf.homeCols}", { pf.homeCols = (pf.homeCols - 1).coerceAtLeast(2) }, { pf.homeCols = (pf.homeCols + 1).coerceAtMost(6) })
+            Stepper("Lignes (paysage)", "${pf.homeRows}", { pf.homeRows = (pf.homeRows - 1).coerceAtLeast(1) }, { pf.homeRows = (pf.homeRows + 1).coerceAtMost(4) })
             val order = pf.cardOrder
             val off = pf.cardsOff
             order.forEachIndexed { i, c ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    val (cw, ch) = pf.cardSize(c)
                     Text(c.label, color = p.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+                    Text(
+                        "$cw×$ch",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 14.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).clickable {
+                            // cycle 1×1 → 2×1 → 1×2 → 2×2
+                            val next = when (cw to ch) { 1 to 1 -> 2 to 1; 2 to 1 -> 1 to 2; 1 to 2 -> 2 to 2; else -> 1 to 1 }
+                            pf.setCardSize(c, next.first, next.second)
+                        }.padding(8.dp),
+                    )
                     IconButton(onClick = {
                         if (i > 0) {
                             val l = order.toMutableList()
@@ -262,7 +315,7 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
             ChoiceRow("Navigation", state.labelOf(state.navPackage())) { picker = "nav" }
             ChoiceRow("Musique", state.labelOf(state.musicPackage())) { picker = "music" }
             ChoiceRow(
-                "Dock (max ${AppState.MAX_FAVORITES})",
+                "Applis du dock",
                 "${(pf.favorites ?: emptyList()).size} app(s)",
             ) { picker = "dock" }
             ChoiceRow("Applications masquées", "${pf.hidden.size}") { picker = "hidden" }
@@ -272,6 +325,12 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
                 Pill("Les plus utilisées", pf.drawerSort == 1, { pf.drawerSort = 1 })
             }
             SwitchRow("Noms sous les icônes", pf.drawerLabels) { pf.drawerLabels = it }
+            Label("Boutons du dock (appui long sur une appli du dock : déplacer / retirer)")
+            SwitchRow("Bouton « + » pour ajouter des applis", pf.dockAdd) { pf.dockAdd = it }
+            SwitchRow("Bouton Ma voiture", pf.dockCar) { pf.dockCar = it }
+            SwitchRow("Bouton Téléphone", pf.dockPhone) { pf.dockPhone = it }
+            SwitchRow("Bouton Assistant vocal", pf.dockMic) { pf.dockMic = it }
+            SwitchRow("Bouton Centre de contrôle", pf.dockControl) { pf.dockControl = it }
         }
 
         // ------------------------------------------------------- Destinations
@@ -436,7 +495,7 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
         }
 
         "dock" -> AppPickerDialog(
-            title = "Applications du dock (max ${AppState.MAX_FAVORITES})",
+            title = "Applications du dock",
             apps = state.apps,
             selected = pf.favorites ?: emptyList(),
             multi = true,
@@ -557,7 +616,7 @@ private fun ChoiceRow(label: String, value: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AppPickerDialog(
+fun AppPickerDialog(
     title: String,
     apps: List<AppItem>,
     selected: List<String>,

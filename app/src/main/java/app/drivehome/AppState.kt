@@ -13,7 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import java.util.Calendar
 
-enum class Screen { Home, Drawer, Phone, Messages, Settings }
+enum class Screen { Home, Car, Drawer, Phone, Messages, Settings }
 
 /** État global de l'appli : réglages, apps, média, GPS, météo, écran courant. */
 class AppState(context: Context) {
@@ -24,12 +24,14 @@ class AppState(context: Context) {
     val drive = DriveTracker(appContext, prefs)
     val weather = WeatherRepo(prefs)
     val voice = Voice(appContext)
+    val car = CarManager(appContext, prefs)
 
     var apps by mutableStateOf<List<AppItem>>(emptyList())
         private set
 
     var screen by mutableStateOf(Screen.Home)
     var controlCenter by mutableStateOf(false)
+    var editHome by mutableStateOf(false)
 
     /** Heure courante en ms, rafraîchie chaque seconde par l'interface. */
     var now by mutableLongStateOf(System.currentTimeMillis())
@@ -61,6 +63,10 @@ class AppState(context: Context) {
     init {
         autoNight = computeNight(System.currentTimeMillis())
         NotifStore.onNew = { m -> onNewMessage(m) }
+        car.onSpeak = { t ->
+            voice.rate = prefs.speechRate / 100f
+            voice.speak(t)
+        }
     }
 
     val visibleApps: List<AppItem>
@@ -88,6 +94,7 @@ class AppState(context: Context) {
         reload()
         media.start()
         drive.start()
+        car.start()
         voice.rate = prefs.speechRate / 100f
         if (!batteryRegistered) {
             try {
@@ -110,6 +117,7 @@ class AppState(context: Context) {
 
     fun onDestroy() {
         drive.stop()
+        car.stop()
         voice.shutdown()
         if (batteryRegistered) {
             try {
@@ -146,6 +154,30 @@ class AppState(context: Context) {
     fun toggleFavorite(pkg: String) {
         val cur = prefs.favorites ?: emptyList()
         prefs.setFavorites(if (pkg in cur) cur - pkg else (cur + pkg).takeLast(MAX_FAVORITES))
+    }
+
+    /** Déplace une app du dock d'un cran (-1 = vers le début, +1 = vers la fin). */
+    fun moveFavorite(pkg: String, delta: Int) {
+        val l = (prefs.favorites ?: emptyList()).toMutableList()
+        val i = l.indexOf(pkg)
+        val j = i + delta
+        if (i < 0 || j < 0 || j > l.lastIndex) return
+        l.add(j, l.removeAt(i))
+        prefs.setFavorites(l)
+    }
+
+    fun fuelLabel(): String = when (prefs.carFuel) {
+        1 -> "Essence"
+        2 -> "Hybride"
+        3 -> "Électrique"
+        else -> "Diesel"
+    }
+
+    /** Requête « station » adaptée au carburant de la voiture. */
+    fun fuelStationQuery(): String = when (prefs.carFuel) {
+        3 -> "borne de recharge"
+        0 -> "station gazole"
+        else -> "station essence"
     }
 
     fun toggleHidden(pkg: String) {
@@ -196,6 +228,6 @@ class AppState(context: Context) {
     }
 
     companion object {
-        const val MAX_FAVORITES = 8
+        const val MAX_FAVORITES = 24
     }
 }

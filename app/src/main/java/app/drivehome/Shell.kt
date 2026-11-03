@@ -11,6 +11,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -90,6 +94,7 @@ fun Root(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
             val night = state.computeNight(t)
             if (night != state.autoNight) state.autoNight = night
             state.drive.tick()
+            state.car.tick(state.drive.speedKmh)
             delay(1000)
         }
     }
@@ -103,8 +108,12 @@ fun Root(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
         }
     }
 
-    BackHandler(enabled = state.screen != Screen.Home || state.controlCenter) {
-        if (state.controlCenter) state.controlCenter = false else state.screen = Screen.Home
+    BackHandler(enabled = state.screen != Screen.Home || state.controlCenter || state.editHome) {
+        when {
+            state.controlCenter -> state.controlCenter = false
+            state.editHome -> state.editHome = false
+            else -> state.screen = Screen.Home
+        }
     }
 
     val idleMs = pf.screensaverMin * 60_000L
@@ -129,6 +138,7 @@ fun Root(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
             Box(Modifier.weight(1f).fillMaxWidth()) { Shell(state, onRequestPermissions) }
         }
 
+        DoorAlertBanner(state)
         AnimatedVisibility(visible = state.controlCenter, enter = fadeIn(), exit = fadeOut()) {
             ControlCenter(state)
         }
@@ -303,6 +313,7 @@ fun Shell(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
 fun ScreenContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<String>) -> Unit) {
     when (state.screen) {
         Screen.Home -> HomeContent(state, wide, onRequestPermissions)
+        Screen.Car -> CarScreen(state, onRequestPermissions)
         Screen.Drawer -> DrawerScreen(state)
         Screen.Phone -> PhoneScreen(state, onRequestPermissions)
         Screen.Messages -> MessagesScreen(state)
@@ -310,16 +321,20 @@ fun ScreenContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<S
     }
 }
 
-/** Barre d'accès rapide : accueil, favoris, téléphone, apps, assistant, centre de contrôle, réglages. */
+/** Barre d'accès rapide : accueil, voiture, apps favorites (à volonté), téléphone, tiroir, assistant, contrôle, réglages. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Dock(state: AppState, vertical: Boolean) {
     val ctx = LocalContext.current
     val p = LocalPalette.current
-    val scale = state.prefs.iconScale / 100f
+    val pf = state.prefs
+    val scale = pf.iconScale / 100f
     val iconSize = (56 * scale).dp
-    val favorites = (state.prefs.favorites ?: emptyList())
+    val favorites = (pf.favorites ?: emptyList())
         .filter { fav -> state.apps.any { it.pkg == fav } }
     val onPrimary = MaterialTheme.colorScheme.onPrimary
+    var menuFor by remember { mutableStateOf<String?>(null) }
+    var addDialog by remember { mutableStateOf(false) }
 
     @Composable
     fun ScreenButton(target: Screen, content: @Composable (Color) -> Unit) {
@@ -333,26 +348,73 @@ fun Dock(state: AppState, vertical: Boolean) {
 
     val items: @Composable () -> Unit = {
         ScreenButton(Screen.Home) { Icon(Icons.Filled.Home, contentDescription = "Accueil", tint = it) }
+        if (pf.dockCar) {
+            ScreenButton(Screen.Car) { CarGlyph(it, state.car.doors.anyOpen()) }
+        }
 
         favorites.forEach { pkg ->
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { state.launch(pkg) },
-            ) {
-                AppIcon(pkg, iconSize)
+            Box {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .combinedClickable(
+                            onClick = { state.launch(pkg) },
+                            onLongClick = { menuFor = pkg },
+                        ),
+                ) {
+                    AppIcon(pkg, iconSize)
+                }
+                DropdownMenu(expanded = menuFor == pkg, onDismissRequest = { menuFor = null }) {
+                    Text(
+                        state.labelOf(pkg),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (vertical) "↑ Monter" else "← Vers la gauche") },
+                        onClick = { state.moveFavorite(pkg, -1) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (vertical) "↓ Descendre" else "→ Vers la droite") },
+                        onClick = { state.moveFavorite(pkg, 1) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Retirer du dock") },
+                        onClick = {
+                            state.toggleFavorite(pkg)
+                            menuFor = null
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Infos sur l'application") },
+                        onClick = {
+                            Apps.openAppInfo(ctx, pkg)
+                            menuFor = null
+                        },
+                    )
+                }
             }
         }
 
-        ScreenButton(Screen.Phone) { Icon(Icons.Filled.Call, contentDescription = "Téléphone", tint = it) }
+        if (pf.dockAdd) {
+            RoundButton(onClick = { addDialog = true }, size = iconSize) {
+                Text("+", color = p.text, fontSize = 30.sp, fontWeight = FontWeight.Light)
+            }
+        }
+        if (pf.dockPhone) {
+            ScreenButton(Screen.Phone) { Icon(Icons.Filled.Call, contentDescription = "Téléphone", tint = it) }
+        }
         ScreenButton(Screen.Drawer) { AppsGlyph(it) }
 
-        RoundButton(onClick = { Apps.voiceAssistant(ctx) }, size = iconSize) {
-            MicGlyph(p.text)
+        if (pf.dockMic) {
+            RoundButton(onClick = { Apps.voiceAssistant(ctx) }, size = iconSize) {
+                MicGlyph(p.text)
+            }
         }
-
-        RoundButton(onClick = { state.controlCenter = true }, size = iconSize, filled = state.controlCenter) {
-            SlidersGlyph(if (state.controlCenter) onPrimary else p.text)
+        if (pf.dockControl) {
+            RoundButton(onClick = { state.controlCenter = true }, size = iconSize, filled = state.controlCenter) {
+                SlidersGlyph(if (state.controlCenter) onPrimary else p.text)
+            }
         }
 
         ScreenButton(Screen.Settings) { Icon(Icons.Filled.Settings, contentDescription = "Réglages", tint = it) }
@@ -380,6 +442,41 @@ fun Dock(state: AppState, vertical: Boolean) {
             horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) { items() }
+    }
+
+    if (addDialog) {
+        AppPickerDialog(
+            title = "Applications du dock",
+            apps = state.apps,
+            selected = pf.favorites ?: emptyList(),
+            multi = true,
+            max = AppState.MAX_FAVORITES,
+            onDismiss = { addDialog = false },
+        ) { res ->
+            pf.setFavorites(res)
+            addDialog = false
+        }
+    }
+}
+
+/** Petite silhouette de voiture (point orange si un ouvrant est ouvert). */
+@Composable
+fun CarGlyph(color: Color, alert: Boolean) {
+    Canvas(Modifier.size(30.dp)) {
+        val w = size.width
+        val h = size.height
+        drawRoundRect(color, Offset(w * 0.06f, h * 0.42f), Size(w * 0.88f, h * 0.30f), CornerRadius(w * 0.08f, w * 0.08f))
+        val roof = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.22f, h * 0.44f)
+            lineTo(w * 0.32f, h * 0.22f)
+            lineTo(w * 0.80f, h * 0.22f)
+            lineTo(w * 0.90f, h * 0.44f)
+            close()
+        }
+        drawPath(roof, color)
+        drawCircle(color, w * 0.10f, Offset(w * 0.26f, h * 0.76f))
+        drawCircle(color, w * 0.10f, Offset(w * 0.74f, h * 0.76f))
+        if (alert) drawCircle(Color(0xFFFF9F0A), w * 0.14f, Offset(w * 0.86f, h * 0.14f))
     }
 }
 

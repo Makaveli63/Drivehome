@@ -68,6 +68,22 @@ par GPS ou ville choisie
 
 **Centre de contrôle** — volume, luminosité, thème, Wi-Fi, Bluetooth, égaliseur, plein écran…
 
+**Ma voiture** — break dessiné en 3D (blanc par défaut, couleur au choix), qu'on fait tourner
+du doigt. Les portes, le coffre et le capot s'ouvrent sur le dessin, avec bandeau d'alerte et annonce
+vocale, et un avertissement si un ouvrant est ouvert en roulant. Plaque d'immatriculation, motorisation.
+- Tableau de bord moteur via boîtier **OBD2 Bluetooth (ELM327)** : régime, vitesse, liquide de
+  refroidissement, huile, tension batterie, carburant, charge, accélérateur, temp. extérieure
+- Diagnostic : lecture et effacement des codes défaut
+- Portes / coffre depuis le **CANbus** de l'autoradio : DriveHome écoute la diffusion
+  `app.drivehome.CAR_STATUS` (extras `door_fl`, `door_fr`, `door_rl`, `door_rr`, `trunk`, `hood`,
+  `fuel`, `range_km`, `temp_out`). Test : `adb shell am broadcast -a app.drivehome.CAR_STATUS --ez door_fl true`
+
+**Tuiles** — sur l'accueil, « ✎ Modifier » : ajouter, retirer, déplacer et redimensionner chaque
+tuile (largeur × hauteur), grille réglable (colonnes × lignes).
+
+**Dock** — bouton « + » pour ajouter autant d'applis que tu veux ; appui long sur une appli du
+dock pour la déplacer ou la retirer ; boutons fixes masquables.
+
 **Personnalisation**
 - Thème auto (horaires réglables ou lever/coucher du soleil), sombre, clair
 - 12 couleurs d'accent, 9 fonds d'écran + image perso (avec voile réglable)

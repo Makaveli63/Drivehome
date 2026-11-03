@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             state.drive.start()
+            state.car.start()
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
 
     fun askPermissions(perms: Array<String>) {
         try {
+            if (perms.isEmpty()) return
             permissionLauncher.launch(perms)
         } catch (e: Exception) {
             Apps.toast(this, "Impossible de demander l'autorisation")
@@ -120,5 +122,7 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.ACCESS_COARSE_LOCATION,
         )
         val PHONE_PERMISSIONS = arrayOf(Manifest.permission.CALL_PHONE)
+        val BT_PERMISSIONS: Array<String> =
+            if (android.os.Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_CONNECT) else emptyArray()
     }
 }

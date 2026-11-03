@@ -60,119 +60,11 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun HomeContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<String>) -> Unit) {
-    val p = LocalPalette.current
-    val cards = state.enabledCards()
-
-    if (cards.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Toutes les cartes sont masquées.\nActive-les dans Réglages → Accueil.",
-                color = p.sub,
-                fontSize = 18.sp,
-                textAlign = TextAlign.Center,
-            )
-        }
-        return
-    }
-
-    // Page 1 : tableau de bord (1 grande carte + 2), pages suivantes : grilles de 4.
-    val pages: List<List<CardType>> = if (wide) {
-        listOf(cards.take(3)) + cards.drop(3).chunked(4)
-    } else {
-        cards.chunked(3)
-    }
-    val pager = rememberPagerState(pageCount = { pages.size })
-
-    Column(Modifier.fillMaxSize()) {
-        HorizontalPager(
-            state = pager,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        ) { index ->
-            val page = pages[index.coerceIn(0, pages.lastIndex)]
-            PageLayout(state, page, wide, dashboard = index == 0, onRequestPermissions)
-        }
-        if (pages.size > 1) {
-            Row(
-                Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                repeat(pages.size) { i ->
-                    Box(
-                        Modifier
-                            .padding(horizontal = 4.dp)
-                            .size(if (i == pager.currentPage) 10.dp else 7.dp)
-                            .clip(CircleShape)
-                            .background(if (i == pager.currentPage) p.text else p.sub.copy(alpha = 0.4f)),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PageLayout(
-    state: AppState,
-    cards: List<CardType>,
-    wide: Boolean,
-    dashboard: Boolean,
-    onRequestPermissions: (Array<String>) -> Unit,
-) {
-    val gap = 14.dp
-    val pad = Modifier.fillMaxSize().padding(14.dp)
-
-    @Composable
-    fun C(type: CardType, m: Modifier) = AnyCard(state, type, m, onRequestPermissions)
-
-    when {
-        !wide -> Column(pad, verticalArrangement = Arrangement.spacedBy(gap)) {
-            cards.forEach { C(it, Modifier.weight(1f).fillMaxWidth()) }
-        }
-
-        dashboard -> Row(pad, horizontalArrangement = Arrangement.spacedBy(gap)) {
-            C(cards[0], Modifier.weight(1.15f).fillMaxHeight())
-            if (cards.size > 1) {
-                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                    cards.drop(1).forEach { C(it, Modifier.weight(1f).fillMaxWidth()) }
-                }
-            }
-        }
-
-        else -> Column(pad, verticalArrangement = Arrangement.spacedBy(gap)) {
-            cards.chunked(2).forEach { row ->
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    row.forEach { C(it, Modifier.weight(1f).fillMaxHeight()) }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AnyCard(state: AppState, type: CardType, modifier: Modifier, onRequestPermissions: (Array<String>) -> Unit) {
-    when (type) {
-        CardType.NAV -> NavCard(state, modifier)
-        CardType.MEDIA -> MediaCard(state, modifier)
-        CardType.SPEED -> SpeedCard(state, modifier, onRequestPermissions)
-        CardType.CLOCK -> ClockCard(state, modifier)
-        CardType.WEATHER -> WeatherCard(state, modifier, onRequestPermissions)
-        CardType.TRIP -> TripCard(state, modifier)
-        CardType.MESSAGES -> MessagesCard(state, modifier)
-        CardType.CONTACTS -> ContactsCard(state, modifier)
-        CardType.APPS -> AppsCard(state, modifier)
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
 
 private val NEARBY = listOf(
-    "⛽ Essence" to "station essence",
     "🔌 Recharge" to "borne de recharge",
     "🅿️ Parking" to "parking",
     "🍴 Restaurant" to "restaurant",
@@ -226,7 +118,7 @@ fun NavCard(state: AppState, modifier: Modifier) {
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    NEARBY.forEach { (label, q) ->
+                    (listOf("⛽ " + (if (state.prefs.carFuel == 0) "Gazole" else "Essence") to state.fuelStationQuery()) + NEARBY).forEach { (label, q) ->
                         Box(
                             Modifier
                                 .clip(RoundedCornerShape(50))

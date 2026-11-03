@@ -18,16 +18,18 @@ data class Place(val label: String, val address: String)
 data class Contact(val name: String, val number: String)
 
 /** Cartes possibles sur l'écran d'accueil. */
-enum class CardType(val id: String, val label: String) {
-    NAV("nav", "Navigation"),
-    MEDIA("media", "Musique"),
-    SPEED("speed", "Compteur de vitesse"),
-    CLOCK("clock", "Horloge"),
-    WEATHER("weather", "Météo"),
-    TRIP("trip", "Ordinateur de bord"),
-    MESSAGES("messages", "Messages"),
-    CONTACTS("contacts", "Contacts favoris"),
-    APPS("apps", "Raccourcis d'apps"),
+enum class CardType(val id: String, val label: String, val defW: Int, val defH: Int) {
+    NAV("nav", "Navigation", 2, 2),
+    CAR("car", "Ma voiture", 1, 2),
+    MEDIA("media", "Musique", 1, 2),
+    SPEED("speed", "Compteur de vitesse", 1, 1),
+    CLOCK("clock", "Horloge", 1, 1),
+    WEATHER("weather", "Météo", 1, 1),
+    TRIP("trip", "Ordinateur de bord", 1, 1),
+    ENGINE("engine", "Moteur (OBD)", 2, 1),
+    MESSAGES("messages", "Messages", 2, 1),
+    CONTACTS("contacts", "Contacts favoris", 2, 1),
+    APPS("apps", "Raccourcis d'apps", 2, 1),
     ;
 
     companion object {
@@ -115,13 +117,37 @@ class Prefs(context: Context) {
     // ---- Accueil --------------------------------------------------------------
 
     var cardOrderRaw by StrPref("cardOrder", CardType.entries.joinToString(",") { it.id })
-    var cardsOffRaw by StrPref("cardsOff", "messages,contacts,apps")
+    var cardsOffRaw by StrPref("cardsOff", "engine,messages,contacts,apps")
+    private var cardSizesRaw by StrPref("cardSizes", "")
+    /** Grille de l'accueil en mode paysage. */
+    var homeCols by IntPref("homeCols", 4)
+    var homeRows by IntPref("homeRows", 2)
 
     val cardOrder: List<CardType>
         get() {
-            val saved = cardOrderRaw.split(",").mapNotNull { CardType.of(it) }
+            val saved = cardOrderRaw.split(",").mapNotNull { CardType.of(it) }.toMutableList()
+            // nouvelle carte « Ma voiture » : placée juste après la première
+            if (CardType.CAR !in saved && saved.isNotEmpty()) saved.add(1, CardType.CAR)
             return saved + CardType.entries.filter { it !in saved }
         }
+
+    /** Taille d'une tuile en cellules (largeur, hauteur). */
+    fun cardSize(c: CardType): Pair<Int, Int> {
+        val m = cardSizesRaw.split(",").mapNotNull {
+            val kv = it.split("=")
+            val wh = kv.getOrNull(1)?.split("x")
+            val w = wh?.getOrNull(0)?.toIntOrNull()
+            val h = wh?.getOrNull(1)?.toIntOrNull()
+            if (kv.size == 2 && w != null && h != null) kv[0] to (w to h) else null
+        }.toMap()
+        return m[c.id] ?: (c.defW to c.defH)
+    }
+
+    fun setCardSize(c: CardType, w: Int, h: Int) {
+        val all = CardType.entries.associate { it.id to cardSize(it) }.toMutableMap()
+        all[c.id] = w.coerceIn(1, 4) to h.coerceIn(1, 3)
+        cardSizesRaw = all.entries.joinToString(",") { "${it.key}=${it.value.first}x${it.value.second}" }
+    }
 
     val cardsOff: Set<CardType>
         get() = cardsOffRaw.split(",").mapNotNull { CardType.of(it) }.toSet()
@@ -134,6 +160,26 @@ class Prefs(context: Context) {
         val cur = cardsOff
         cardsOffRaw = (if (on) cur - c else cur + c).joinToString(",") { it.id }
     }
+
+    // ---- Ma voiture -----------------------------------------------------------
+
+    var carName by StrPref("carName", "Passat SW")
+    var carPlate by StrPref("carPlate", "")
+    /** 0 = diesel, 1 = essence, 2 = hybride, 3 = électrique. */
+    var carFuel by IntPref("carFuel", 0)
+    var carColor by IntPref("carColor", 0)
+    var obdAddress by StrPref("obdAddress", "")
+    var obdName by StrPref("obdName", "")
+    var obdAuto by BoolPref("obdAuto", true)
+    var doorVoice by BoolPref("doorVoice", true)
+
+    // ---- Dock -------------------------------------------------------------------
+
+    var dockPhone by BoolPref("dockPhone", true)
+    var dockCar by BoolPref("dockCar", true)
+    var dockMic by BoolPref("dockMic", true)
+    var dockControl by BoolPref("dockControl", true)
+    var dockAdd by BoolPref("dockAdd", true)
 
     // ---- Applications --------------------------------------------------------
 
