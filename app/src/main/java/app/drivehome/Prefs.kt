@@ -163,7 +163,9 @@ class Prefs(context: Context) {
 
     // ---- Ma voiture -----------------------------------------------------------
 
-    var carName by StrPref("carName", "Passat SW")
+    var carName by StrPref("carName", "Passat Variant")
+    /** Dessin : 0 = profil (B9), 1 = vue de dessus 3D. */
+    var carView by IntPref("carView", 0)
     var carPlate by StrPref("carPlate", "")
     /** 0 = diesel, 1 = essence, 2 = hybride, 3 = électrique. */
     var carFuel by IntPref("carFuel", 0)

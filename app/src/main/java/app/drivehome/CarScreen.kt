@@ -99,8 +99,10 @@ fun CarCard(state: AppState, modifier: Modifier) {
     CardShell(modifier.clickable { state.screen = Screen.Car }, tint = if (d.anyOpen()) Color(0x33FF9F0A) else Color.Transparent) {
         Column(Modifier.fillMaxSize()) {
             CardHeader(state.prefs.carName.ifBlank { "Ma voiture" })
-            if (state.prefs.car3dOnHome) {
+            if (state.prefs.car3dOnHome || !Car3D.exists(LocalContext.current)) {
                 CarVisual(state, Modifier.weight(1f).fillMaxWidth(), interactive = false)
+            } else if (state.prefs.carView == 0) {
+                SideCarView(d, state.carColor(), Modifier.weight(1f).fillMaxWidth())
             } else {
                 CarView(d, state.carColor(), Modifier.weight(1f).fillMaxWidth(), rotatable = false)
             }
@@ -247,6 +249,20 @@ fun CarVisual(state: AppState, modifier: Modifier, interactive: Boolean, onParts
                 )
             }
         }
+    } else if (pf.carView == 0) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            SideCarView(state.car.doors, state.carColor(), Modifier.fillMaxWidth())
+            if (state.car.doors.anyOpen()) {
+                CarView(
+                    state.car.doors,
+                    state.carColor(),
+                    Modifier.align(Alignment.TopStart).width(70.dp).height(70.dp),
+                    tilt = 0f,
+                    initialSpin = 0f,
+                    rotatable = false,
+                )
+            }
+        }
     } else {
         CarView(state.car.doors, state.carColor(), modifier, rotatable = interactive)
     }
@@ -271,7 +287,10 @@ private fun CarHero(state: AppState, modifier: Modifier, onPartsListed: (List<St
                 LicensePlate(pf.carPlate)
             }
             CarVisual(state, Modifier.weight(1f).fillMaxWidth(), interactive = true, onPartsListed = onPartsListed)
-            Text("Glisse pour faire tourner la voiture (pince pour zoomer en 3D)", color = p.sub, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill("Profil", pf.carView == 0, { pf.carView = 0 })
+                Pill("Vue 3/4 dessus", pf.carView == 1, { pf.carView = 1 })
+            }
             Spacer(Modifier.height(6.dp))
             Text(
                 doorSummary(d),
