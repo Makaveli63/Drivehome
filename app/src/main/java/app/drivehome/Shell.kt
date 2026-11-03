@@ -181,7 +181,7 @@ fun WallpaperLayer(state: AppState) {
     }
 }
 
-private fun decodeSampled(ctx: Context, uriString: String): ImageBitmap? {
+fun decodeSampled(ctx: Context, uriString: String): ImageBitmap? {
     return try {
         val uri = Uri.parse(uriString)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }

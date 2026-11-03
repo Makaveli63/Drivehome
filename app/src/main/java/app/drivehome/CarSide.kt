@@ -131,6 +131,21 @@ private fun DrawScope.drawSideCar(
     drawLine(dark, P(0.545f, 0.04f), P(0.548f, 0.30f), w * 0.012f)
     drawLine(dark, P(0.71f, 0.045f), P(0.725f, 0.26f), w * 0.009f)
     drawLine(Color.White.copy(alpha = 0.10f), P(0.47f, 0.08f), P(0.53f, 0.28f), w * 0.03f)
+    // vitres arrière surteintées
+    val privacy = Path().apply {
+        moveTo(X(0.552f), Y(0.045f))
+        q(0.75f, 0.045f, 0.875f, 0.06f)
+        q(0.915f, 0.08f, 0.935f, 0.19f)
+        lineTo(X(0.925f), Y(0.225f))
+        lineTo(X(0.552f), Y(0.30f))
+        close()
+    }
+    drawPath(privacy, Color.Black.copy(alpha = 0.45f))
+    // antenne « aileron de requin »
+    drawPath(poly(listOf(0.79f to -0.002f, 0.815f to -0.055f, 0.84f to 0.0f)), Color(0xFF1C1F24))
+    // attelage
+    drawLine(Color(0xFF1C1F24), P(0.99f, 0.86f), P(1.012f, 0.87f), h * 0.018f, cap = StrokeCap.Round)
+    drawCircle(Color(0xFF2A2D33), h * 0.016f, P(1.015f, 0.85f))
     // côté passager : liseré orange sous la vitre correspondante
     if (fr > 0.01f) drawLine(warn.copy(alpha = fr), P(0.33f, 0.335f), P(0.54f, 0.305f), h * 0.02f, cap = StrokeCap.Round)
     if (rr > 0.01f) drawLine(warn.copy(alpha = rr), P(0.555f, 0.30f), P(0.72f, 0.275f), h * 0.02f, cap = StrokeCap.Round)
@@ -207,25 +222,24 @@ private fun DrawScope.drawSideCar(
     // barres de toit
     drawLine(Color(0xFFBFC4CB), P(0.50f, -0.005f), P(0.86f, 0.005f), h * 0.018f, cap = StrokeCap.Round)
 
-    // roues : pneus + jantes aéro
+    // roues : pneus + jantes alu 10 branches (5 doubles branches)
     fun wheel(cx: Float) {
         val c = Offset(X(cx), wheelY)
         drawCircle(Color(0xFF16181C), r, c)
-        drawCircle(Brush.radialGradient(listOf(Color(0xFFF0F2F4), Color(0xFFA6ABB2)), c, r * 0.74f), r * 0.72f, c)
-        for (i in 0 until 5) {
-            val a0 = Math.toRadians((i * 72 - 70).toDouble())
-            val a1 = a0 + 0.55
-            val spoke = Path().apply {
-                moveTo(c.x + (cos(a0) * r * 0.30f).toFloat(), c.y + (sin(a0) * r * 0.30f).toFloat())
-                lineTo(c.x + (cos(a0) * r * 0.66f).toFloat(), c.y + (sin(a0) * r * 0.66f).toFloat())
-                lineTo(c.x + (cos(a1) * r * 0.66f).toFloat(), c.y + (sin(a1) * r * 0.66f).toFloat())
-                lineTo(c.x + (cos(a1) * r * 0.30f).toFloat(), c.y + (sin(a1) * r * 0.30f).toFloat())
-                close()
+        drawCircle(Color(0xFF8E939A), r * 0.73f, c)
+        drawCircle(Color(0xFF2A2D33), r * 0.68f, c)
+        for (k in 0 until 5) {
+            for (d in listOf(-10.0, 10.0)) {
+                val a = Math.toRadians(k * 72.0 - 90.0 + d)
+                val e = Offset(c.x + (cos(a) * r * 0.69f).toFloat(), c.y + (sin(a) * r * 0.69f).toFloat())
+                val m = Offset(c.x + (cos(a - Math.toRadians(d * 0.8)) * r * 0.22f).toFloat(), c.y + (sin(a - Math.toRadians(d * 0.8)) * r * 0.22f).toFloat())
+                drawLine(Color(0xFFD9DCE0), m, e, r * 0.10f, cap = StrokeCap.Round)
+                drawLine(Color.White.copy(alpha = 0.6f), m, e, r * 0.035f, cap = StrokeCap.Round)
             }
-            drawPath(spoke, Color(0xFF2B2F35))
         }
-        drawCircle(Color(0xFF3A3E45), r * 0.16f, c)
-        drawCircle(Color.Black.copy(alpha = 0.35f), r * 0.72f, c, style = Stroke(px * 0.8f))
+        drawCircle(Brush.radialGradient(listOf(Color(0xFFE9ECEF), Color(0xFF9EA3AA)), c, r * 0.25f), r * 0.24f, c)
+        drawCircle(Color(0xFF3A3E45), r * 0.11f, c)
+        drawCircle(Color(0xFFBFC3C9), r * 0.73f, c, style = Stroke(r * 0.05f))
     }
     wheel(fx)
     wheel(rx)

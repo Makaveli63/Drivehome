@@ -101,7 +101,7 @@ fun CarCard(state: AppState, modifier: Modifier) {
             CardHeader(state.prefs.carName.ifBlank { "Ma voiture" })
             if (state.prefs.car3dOnHome || !Car3D.exists(LocalContext.current)) {
                 CarVisual(state, Modifier.weight(1f).fillMaxWidth(), interactive = false)
-            } else if (state.prefs.carView == 0) {
+            } else if (state.prefs.carView != 1) {
                 SideCarView(d, state.carColor(), Modifier.weight(1f).fillMaxWidth())
             } else {
                 CarView(d, state.carColor(), Modifier.weight(1f).fillMaxWidth(), rotatable = false)
@@ -249,7 +249,9 @@ fun CarVisual(state: AppState, modifier: Modifier, interactive: Boolean, onParts
                 )
             }
         }
-    } else if (pf.carView == 0) {
+    } else if (pf.carView == 2 && pf.carPhotoUri.isNotEmpty()) {
+        CarPhoto(state, modifier)
+    } else if (pf.carView != 1) {
         Box(modifier, contentAlignment = Alignment.Center) {
             SideCarView(state.car.doors, state.carColor(), Modifier.fillMaxWidth())
             if (state.car.doors.anyOpen()) {
@@ -270,6 +272,7 @@ fun CarVisual(state: AppState, modifier: Modifier, interactive: Boolean, onParts
 
 @Composable
 private fun CarHero(state: AppState, modifier: Modifier, onPartsListed: (List<String>) -> Unit) {
+    val ctxHero = LocalContext.current
     val p = LocalPalette.current
     val pf = state.prefs
     val d = state.car.doors
@@ -287,9 +290,33 @@ private fun CarHero(state: AppState, modifier: Modifier, onPartsListed: (List<St
                 LicensePlate(pf.carPlate)
             }
             CarVisual(state, Modifier.weight(1f).fillMaxWidth(), interactive = true, onPartsListed = onPartsListed)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+            ) { uri ->
+                if (uri != null) {
+                    try {
+                        ctxHero.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (e: Exception) {
+                        // droit persistant indisponible
+                    }
+                    pf.carPhotoUri = uri.toString()
+                    pf.carView = 2
+                }
+            }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill("Profil", pf.carView == 0, { pf.carView = 0 })
                 Pill("Vue 3/4 dessus", pf.carView == 1, { pf.carView = 1 })
+                Pill(if (pf.carPhotoUri.isEmpty()) "Ma photo…" else "Ma photo", pf.carView == 2, {
+                    if (pf.carPhotoUri.isEmpty() || pf.carView == 2) {
+                        try {
+                            photoPicker.launch(arrayOf("image/*"))
+                        } catch (e: Exception) {
+                            Apps.toast(ctxHero, "Aucun sélecteur de fichiers")
+                        }
+                    } else {
+                        pf.carView = 2
+                    }
+                })
             }
             Spacer(Modifier.height(6.dp))
             Text(
@@ -712,5 +739,42 @@ private fun Model3DPanel(state: AppState, partNames: List<String>) {
             },
             confirmButton = { TextButton(onClick = { pickFor = null }) { Text("Fermer") } },
         )
+    }
+}
+
+/** Photo de la voiture de l'utilisateur, avec le schéma des ouvrants par-dessus. */
+@Composable
+fun CarPhoto(state: AppState, modifier: Modifier) {
+    val ctx = LocalContext.current
+    val uri = state.prefs.carPhotoUri
+    val img by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, uri) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { decodeSampled(ctx, uri) }
+    }
+    val d = state.car.doors
+    Box(
+        modifier
+            .clip(RoundedCornerShape(20.dp))
+            .then(if (d.anyOpen()) Modifier.border(3.dp, Color(0xFFFF9F0A), RoundedCornerShape(20.dp)) else Modifier),
+    ) {
+        val b = img
+        if (b != null) {
+            androidx.compose.foundation.Image(
+                bitmap = b,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (d.anyOpen()) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xCC1C1C1E)),
+            ) {
+                CarView(d, state.carColor(), Modifier.width(90.dp).height(90.dp), tilt = 0f, initialSpin = 0f, rotatable = false)
+            }
+        }
     }
 }
