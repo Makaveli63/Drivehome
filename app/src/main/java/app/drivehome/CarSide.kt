@@ -26,7 +26,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Passat Variant (B9) dessinée de profil, côté conducteur (avant à droite).
+ * Passat Variant (B8) dessinée de profil, côté conducteur (avant à droite).
  * Portes conducteur, coffre et capot s'ouvrent sur le dessin ; les portes
  * côté passager sont signalées par un liseré orange sur la vitre.
  */
@@ -188,11 +188,22 @@ private fun DrawScope.drawSideCar(
         }
     }
 
-    // signature lumineuse B9 : bandeau avant + feux arrière
-    drawLine(Color(0xFFEAF3FF), P(0.012f, 0.455f), P(0.10f, 0.415f), h * 0.03f, cap = StrokeCap.Round)
-    drawLine(Color(0xFFEAF3FF).copy(alpha = 0.8f), P(0.10f, 0.415f), P(0.17f, 0.385f), h * 0.01f, cap = StrokeCap.Round)
-    drawLine(Color(0xFFC8101A), P(0.925f, 0.31f), P(0.99f, 0.355f), h * 0.045f, cap = StrokeCap.Round)
-    drawLine(Color(0xFFFF5A5A), P(0.94f, 0.315f), P(0.985f, 0.345f), h * 0.013f, cap = StrokeCap.Round)
+    // optiques B8 : phare effilé relié à la calandre chromée, feux arrière en deux parties
+    val headlight = poly(listOf(0.008f to 0.47f, 0.02f to 0.43f, 0.13f to 0.385f, 0.14f to 0.40f, 0.06f to 0.46f))
+    drawPath(headlight, Brush.horizontalGradient(listOf(Color(0xFF9AA6B4), Color(0xFFEAF3FF)), startX = X(0f), endX = X(0.14f)))
+    drawPath(headlight, Color(0xFF555B64), style = Stroke(px * 0.6f))
+    drawLine(Color.White, P(0.03f, 0.445f), P(0.12f, 0.395f), h * 0.008f, cap = StrokeCap.Round) // feux de jour LED
+    drawLine(chrome, P(0.0f, 0.50f), P(0.02f, 0.49f), h * 0.012f, cap = StrokeCap.Round) // calandre
+    drawLine(chrome, P(0.0f, 0.55f), P(0.015f, 0.545f), h * 0.008f, cap = StrokeCap.Round)
+    // antibrouillard
+    drawRoundRect(Color(0xFF2A2D33), P(0.008f, 0.70f), Size(w * 0.03f, h * 0.035f), CornerRadius(h * 0.01f))
+    // feu arrière : partie aile + partie hayon
+    val tailBody = poly(listOf(0.95f to 0.31f, 0.993f to 0.33f, 0.996f to 0.40f, 0.955f to 0.375f))
+    drawPath(tailBody, Color(0xFFB80F18))
+    drawLine(Color(0xFFFF5A5A), P(0.958f, 0.335f), P(0.99f, 0.35f), h * 0.01f, cap = StrokeCap.Round)
+    drawLine(Color(0xFF8E0B12), P(0.93f, 0.31f), P(0.95f, 0.315f), h * 0.03f, cap = StrokeCap.Round)
+    // poignée de hayon / emplacement de plaque
+    drawLine(chrome, P(0.965f, 0.45f), P(0.99f, 0.46f), h * 0.008f, cap = StrokeCap.Round)
     // barres de toit
     drawLine(Color(0xFFBFC4CB), P(0.50f, -0.005f), P(0.86f, 0.005f), h * 0.018f, cap = StrokeCap.Round)
 
