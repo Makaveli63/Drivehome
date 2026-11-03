@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
-import java.util.Calendar
 
 data class Accent(val name: String, val color: Color, val on: Color)
 
@@ -20,7 +19,14 @@ val ACCENTS = listOf(
     Accent("Rose", Color(0xFFFF375F), Color.White),
     Accent("Turquoise", Color(0xFF40C8E0), Color.Black),
     Accent("Jaune", Color(0xFFFFD60A), Color.Black),
+    Accent("Indigo", Color(0xFF5E5CE6), Color.White),
+    Accent("Menthe", Color(0xFF63E6BE), Color.Black),
+    Accent("Argent", Color(0xFFD1D1D6), Color.Black),
+    Accent("Cuivre", Color(0xFFC8875A), Color.Black),
 )
+
+val DANGER = Color(0xFFFF453A)
+val OK_GREEN = Color(0xFF30D158)
 
 data class WallpaperPreset(val name: String, val dark: List<Color>, val light: List<Color>)
 
@@ -56,6 +62,16 @@ val WALLPAPERS = listOf(
         listOf(Color(0xFFF4F4F6), Color(0xFFDADADF)),
     ),
     WallpaperPreset(
+        "Océan",
+        listOf(Color(0xFF021226), Color(0xFF0A4C8C)),
+        listOf(Color(0xFFE6F1FC), Color(0xFFB9D7F5)),
+    ),
+    WallpaperPreset(
+        "Sport",
+        listOf(Color(0xFF120202), Color(0xFF3A0A0A)),
+        listOf(Color(0xFFFBEDED), Color(0xFFF0C9C9)),
+    ),
+    WallpaperPreset(
         "Noir pur",
         listOf(Color(0xFF000000), Color(0xFF000000)),
         listOf(Color(0xFFFFFFFF), Color(0xFFFFFFFF)),
@@ -82,28 +98,16 @@ val LocalPalette = compositionLocalOf {
     )
 }
 
-fun isNightAt(millis: Long): Boolean {
-    val cal = Calendar.getInstance()
-    cal.timeInMillis = millis
-    val h = cal.get(Calendar.HOUR_OF_DAY)
-    return h >= 19 || h < 7
-}
-
-fun AppState.isNight(): Boolean = when (prefs.themeMode) {
-    1 -> true
-    2 -> false
-    else -> autoNight
-}
-
 @Composable
 fun DriveTheme(state: AppState, content: @Composable () -> Unit) {
     val night = state.isNight()
     val accent = ACCENTS[state.prefs.accentIndex.coerceIn(0, ACCENTS.lastIndex)]
 
+    val op = state.prefs.cardOpacity.coerceIn(10, 100) / 100f
     val palette = if (night) {
         Palette(
             night = true,
-            card = Color(0x80000000),
+            card = Color.Black.copy(alpha = op),
             chip = Color(0x26FFFFFF),
             dock = Color(0x73000000),
             text = Color.White,
@@ -112,7 +116,7 @@ fun DriveTheme(state: AppState, content: @Composable () -> Unit) {
     } else {
         Palette(
             night = false,
-            card = Color(0xB3FFFFFF),
+            card = Color.White.copy(alpha = (op + 0.2f).coerceAtMost(1f)),
             chip = Color(0x14000000),
             dock = Color(0xB3FFFFFF),
             text = Color(0xFF111114),

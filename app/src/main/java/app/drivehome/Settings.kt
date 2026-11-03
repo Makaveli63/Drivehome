@@ -1,11 +1,13 @@
 package app.drivehome
 
 import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,19 +15,26 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -36,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,32 +53,31 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(state: AppState) {
+fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
     val ctx = LocalContext.current
     val p = LocalPalette.current
     val pf = state.prefs
+    val scope = rememberCoroutineScope()
     var picker by remember { mutableStateOf<String?>(null) }
 
-    val imageLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
+    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             try {
-                ctx.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
+                ctx.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             } catch (e: Exception) {
                 // certaines sources ne proposent pas de droit persistant
             }
-            pf.setWallpaperUri(uri.toString())
+            pf.wallpaperUri = uri.toString()
         }
     }
+    val pickContact = rememberContactPicker { c -> pf.setContacts((pf.contacts + c).distinctBy { it.number }) }
 
     Column(
         Modifier
@@ -82,38 +91,49 @@ fun SettingsScreen(state: AppState) {
         // ------------------------------------------------------------ Apparence
         Section("Apparence") {
             Label("Thème")
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Pill("Auto (nuit 19h–7h)", pf.themeMode == 0, { pf.setThemeMode(0) })
-                Pill("Sombre", pf.themeMode == 1, { pf.setThemeMode(1) })
-                Pill("Clair", pf.themeMode == 2, { pf.setThemeMode(2) })
+            ScrollRow {
+                Pill("Auto (horaires)", pf.themeMode == 0, { pf.themeMode = 0 })
+                Pill("Auto (soleil)", pf.themeMode == 3, { pf.themeMode = 3 })
+                Pill("Sombre", pf.themeMode == 1, { pf.themeMode = 1 })
+                Pill("Clair", pf.themeMode == 2, { pf.themeMode = 2 })
+            }
+            if (pf.themeMode == 0) {
+                Stepper("Mode nuit à partir de", "${pf.nightStart} h", { pf.nightStart = (pf.nightStart + 23) % 24 }, { pf.nightStart = (pf.nightStart + 1) % 24 })
+                Stepper("Mode jour à partir de", "${pf.nightEnd} h", { pf.nightEnd = (pf.nightEnd + 23) % 24 }, { pf.nightEnd = (pf.nightEnd + 1) % 24 })
+            }
+            if (pf.themeMode == 3) {
+                Label("Bascule au lever et au coucher du soleil, calculés selon ta position (GPS ou ville météo).")
             }
 
             Label("Couleur d'accent")
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ScrollRow {
                 ACCENTS.forEachIndexed { i, a ->
-                    Swatch(a.color, pf.accentIndex == i, { pf.setAccentIndex(i) })
+                    Swatch(a.color, pf.accentIndex == i, { pf.accentIndex = i })
                 }
             }
 
             Label("Fond d'écran")
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ScrollRow {
                 WALLPAPERS.forEachIndexed { i, w ->
                     val selected = pf.wallpaperIndex == i && pf.wallpaperUri.isEmpty()
                     val ring = if (selected) MaterialTheme.colorScheme.primary else p.chip
-                    Box(
-                        Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(w.dark))
-                            .border(3.dp, ring, CircleShape)
-                            .clickable {
-                                pf.setWallpaperIndex(i)
-                                pf.setWallpaperUri("")
-                            },
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(if (p.night) w.dark else w.light))
+                                .border(3.dp, ring, CircleShape)
+                                .clickable {
+                                    pf.wallpaperIndex = i
+                                    pf.wallpaperUri = ""
+                                },
+                        )
+                        Text(w.name, color = p.sub, fontSize = 11.sp)
+                    }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ScrollRow {
                 Pill("Choisir une image…", pf.wallpaperUri.isNotEmpty(), {
                     try {
                         imageLauncher.launch(arrayOf("image/*"))
@@ -122,31 +142,119 @@ fun SettingsScreen(state: AppState) {
                     }
                 })
                 if (pf.wallpaperUri.isNotEmpty()) {
-                    Pill("Retirer l'image", false, { pf.setWallpaperUri("") })
+                    Pill("Retirer l'image", false, { pf.wallpaperUri = "" })
                 }
             }
-
-            Label("Taille des icônes : ${pf.iconScale} %")
-            Slider(
-                value = pf.iconScale.toFloat(),
-                onValueChange = { pf.setIconScale(it.toInt()) },
-                valueRange = 80f..140f,
-            )
+            if (pf.wallpaperUri.isNotEmpty()) {
+                SliderPref("Assombrir l'image", pf.wallpaperDim, 0, 90, "%") { pf.wallpaperDim = it }
+            }
+            SliderPref("Opacité des cartes", pf.cardOpacity, 10, 100, "%") { pf.cardOpacity = it }
+            SliderPref("Taille de l'interface", pf.uiScale, 70, 150, "%") { pf.uiScale = it }
+            SliderPref("Taille des icônes", pf.iconScale, 70, 150, "%") { pf.iconScale = it }
 
             Label("Position du dock (écran large)")
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Pill("Gauche", pf.dockPos == 0, { pf.setDockPos(0) })
-                Pill("Droite", pf.dockPos == 1, { pf.setDockPos(1) })
-                Pill("Bas", pf.dockPos == 2, { pf.setDockPos(2) })
+            ScrollRow {
+                Pill("Gauche", pf.dockPos == 0, { pf.dockPos = 0 })
+                Pill("Droite", pf.dockPos == 1, { pf.dockPos = 1 })
+                Pill("Bas", pf.dockPos == 2, { pf.dockPos = 2 })
             }
+            SwitchRow("Barre d'état (heure, météo, batterie)", pf.showStatusBar) { pf.showStatusBar = it }
+            SwitchRow("Plein écran (masquer les barres Android)", pf.fullscreen) { pf.fullscreen = it }
+            SwitchRow("Garder l'écran allumé", pf.keepScreenOn) { pf.keepScreenOn = it }
+            SwitchRow("Horloge 24 heures", pf.clock24) { pf.clock24 = it }
+            SwitchRow("Afficher les secondes", pf.showSeconds) { pf.showSeconds = it }
         }
 
         // -------------------------------------------------------------- Accueil
-        Section("Accueil") {
-            SwitchRow("Carte Navigation", pf.showNav) { pf.setShowNav(it) }
-            SwitchRow("Carte Musique", pf.showMedia) { pf.setShowMedia(it) }
-            SwitchRow("Carte Horloge", pf.showClock) { pf.setShowClock(it) }
-            SwitchRow("Horloge 24 heures", pf.clock24) { pf.setClock24(it) }
+        Section("Cartes de l'accueil") {
+            Label("Active, désactive et réordonne les cartes. Les 3 premières forment le tableau de bord ; glisse vers la gauche pour les pages suivantes.")
+            val order = pf.cardOrder
+            val off = pf.cardsOff
+            order.forEachIndexed { i, c ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(c.label, color = p.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+                    IconButton(onClick = {
+                        if (i > 0) {
+                            val l = order.toMutableList()
+                            l.add(i - 1, l.removeAt(i))
+                            pf.setCardOrder(l)
+                        }
+                    }) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Monter", tint = p.text) }
+                    IconButton(onClick = {
+                        if (i < order.lastIndex) {
+                            val l = order.toMutableList()
+                            l.add(i + 1, l.removeAt(i))
+                            pf.setCardOrder(l)
+                        }
+                    }) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Descendre", tint = p.text) }
+                    Switch(checked = c !in off, onCheckedChange = { pf.setCardEnabled(c, it) })
+                }
+            }
+        }
+
+        // --------------------------------------------------------- Conduite
+        Section("Conduite & météo") {
+            Label("Unité de vitesse")
+            ScrollRow {
+                Pill("km/h", pf.speedUnit == 0, { pf.speedUnit = 0 })
+                Pill("mph", pf.speedUnit == 1, { pf.speedUnit = 1 })
+            }
+            Stepper(
+                "Alerte de vitesse",
+                if (pf.speedLimit == 0) "Désactivée" else "${pf.speedLimit} ${speedUnitLabel(pf.speedUnit)}",
+                { pf.speedLimit = (pf.speedLimit - 5).coerceAtLeast(0) },
+                { pf.speedLimit = (pf.speedLimit + 5).coerceAtMost(250) },
+            )
+            SwitchRow("Bip sonore en cas de dépassement", pf.speedBeep) { pf.speedBeep = it }
+            ChoiceRow("Remettre l'ordinateur de bord à zéro", "Réinitialiser") {
+                state.drive.resetTrip()
+                Apps.toast(ctx, "Trajet remis à zéro")
+            }
+            SwitchRow("Température en °F", pf.fahrenheit) { pf.fahrenheit = it }
+
+            var city by remember { mutableStateOf(pf.weatherCity) }
+            Label("Ville pour la météo (vide = position GPS)")
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = city,
+                    onValueChange = { city = it },
+                    singleLine = true,
+                    placeholder = { Text("ex. Lyon") },
+                    modifier = Modifier.weight(1f),
+                )
+                Pill("Valider", false, {
+                    val q = city.trim()
+                    if (q.isEmpty()) {
+                        pf.weatherCity = ""
+                        pf.cityLat = Float.NaN
+                        pf.cityLon = Float.NaN
+                    } else {
+                        scope.launch {
+                            val r = state.weather.geocode(q)
+                            if (r == null) {
+                                Apps.toast(ctx, "Ville introuvable")
+                            } else {
+                                pf.cityLat = r.second.toFloat()
+                                pf.cityLon = r.third.toFloat()
+                                pf.weatherCity = r.first
+                                city = r.first
+                                state.weather.refresh(r.second, r.third, force = true)
+                            }
+                        }
+                    }
+                })
+            }
+        }
+
+        // --------------------------------------------------------- Messages
+        Section("Messages & voix") {
+            SwitchRow("Lire à voix haute les nouveaux messages", pf.readAloud) { pf.readAloud = it }
+            SwitchRow("Masquer le contenu (annoncer seulement l'expéditeur)", pf.hideMsgContent) { pf.hideMsgContent = it }
+            SliderPref("Vitesse de la voix", pf.speechRate, 50, 200, "%") { pf.speechRate = it }
+            ChoiceRow("Tester la voix", "Écouter") {
+                state.voice.rate = pf.speechRate / 100f
+                state.voice.speak("Bonjour ! DriveHome lira tes messages pendant que tu conduis.")
+            }
         }
 
         // --------------------------------------------------------- Applications
@@ -158,33 +266,144 @@ fun SettingsScreen(state: AppState) {
                 "${(pf.favorites ?: emptyList()).size} app(s)",
             ) { picker = "dock" }
             ChoiceRow("Applications masquées", "${pf.hidden.size}") { picker = "hidden" }
+            Label("Tri du tiroir d'applications")
+            ScrollRow {
+                Pill("Alphabétique", pf.drawerSort == 0, { pf.drawerSort = 0 })
+                Pill("Les plus utilisées", pf.drawerSort == 1, { pf.drawerSort = 1 })
+            }
+            SwitchRow("Noms sous les icônes", pf.drawerLabels) { pf.drawerLabels = it }
         }
 
         // ------------------------------------------------------- Destinations
-        Section("Destinations rapides") {
+        Section("Destinations") {
             OutlinedTextField(
                 value = pf.homeAddr,
-                onValueChange = { pf.setHomeAddr(it) },
+                onValueChange = { pf.homeAddr = it },
                 label = { Text("Adresse du domicile") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = pf.workAddr,
-                onValueChange = { pf.setWorkAddr(it) },
+                onValueChange = { pf.workAddr = it },
                 label = { Text("Adresse du travail") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Label("Lieux favoris")
+            pf.places.forEach { pl ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(pl.label, color = p.text, fontSize = 16.sp)
+                        Text(pl.address, color = p.sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    IconButton(onClick = { pf.setPlaces(pf.places.filter { it != pl }) }) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Supprimer", tint = p.sub)
+                    }
+                }
+            }
+            var plLabel by remember { mutableStateOf("") }
+            var plAddr by remember { mutableStateOf("") }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = plLabel,
+                    onValueChange = { plLabel = it },
+                    label = { Text("Nom") },
+                    singleLine = true,
+                    modifier = Modifier.weight(0.6f),
+                )
+                OutlinedTextField(
+                    value = plAddr,
+                    onValueChange = { plAddr = it },
+                    label = { Text("Adresse") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                Pill("Ajouter", false, {
+                    if (plAddr.isNotBlank()) {
+                        pf.setPlaces(pf.places + Place(plLabel.ifBlank { plAddr }.trim(), plAddr.trim()))
+                        plLabel = ""
+                        plAddr = ""
+                    }
+                })
+            }
+        }
+
+        // ------------------------------------------------------- Contacts
+        Section("Contacts favoris") {
+            pf.contacts.forEach { c ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(c.name, color = p.text, fontSize = 16.sp)
+                        Text(c.number, color = p.sub, fontSize = 13.sp)
+                    }
+                    IconButton(onClick = { pf.setContacts(pf.contacts.filter { it != c }) }) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Supprimer", tint = p.sub)
+                    }
+                }
+            }
+            var cName by remember { mutableStateOf("") }
+            var cNum by remember { mutableStateOf("") }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = cName,
+                    onValueChange = { cName = it },
+                    label = { Text("Nom") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = cNum,
+                    onValueChange = { cNum = it },
+                    label = { Text("Numéro") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.weight(1f),
+                )
+                Pill("Ajouter", false, {
+                    if (cNum.isNotBlank()) {
+                        pf.setContacts(pf.contacts + Contact(cName.ifBlank { cNum }.trim(), cNum.trim()))
+                        cName = ""
+                        cNum = ""
+                    }
+                })
+            }
+            ChoiceRow("Choisir dans le carnet d'adresses", "Ouvrir") { pickContact() }
+        }
+
+        // ------------------------------------------------------- Démarrage
+        Section("Démarrage & veille") {
+            SwitchRow("Reprendre la musique au démarrage", pf.autoResumeMusic) { pf.autoResumeMusic = it }
+            SwitchRow("Ouvrir la navigation au démarrage", pf.autoLaunchNav) { pf.autoLaunchNav = it }
+            Label("Écran de veille (horloge) après inactivité sur l'accueil")
+            ScrollRow {
+                listOf(0, 1, 2, 5, 10, 30).forEach { m ->
+                    Pill(if (m == 0) "Jamais" else "$m min", pf.screensaverMin == m, { pf.screensaverMin = m })
+                }
+            }
         }
 
         // --------------------------------------------------------------- Système
-        Section("Système") {
-            ChoiceRow("Launcher par défaut", "Ouvrir") { Apps.openHomeSettings(ctx) }
-            ChoiceRow("Accès aux notifications (musique)", "Ouvrir") {
+        Section("Autorisations & système") {
+            ChoiceRow("Localisation (vitesse, météo, soleil)", if (state.drive.permission) "✓ Autorisée" else "Autoriser") {
+                if (state.drive.permission) Apps.openLocationSettings(ctx)
+                else onRequestPermissions(MainActivity.LOCATION_PERMISSIONS)
+            }
+            ChoiceRow("Accès aux notifications (musique, messages)", if (state.media.info.access) "✓ Autorisé" else "Autoriser") {
                 Apps.openNotificationAccess(ctx)
             }
+            ChoiceRow("Appel direct des favoris", if (Apps.hasCallPermission(ctx)) "✓ Autorisé" else "Autoriser") {
+                onRequestPermissions(MainActivity.PHONE_PERMISSIONS)
+            }
+            ChoiceRow("Réglage de la luminosité", if (Settings.System.canWrite(ctx)) "✓ Autorisé" else "Autoriser") {
+                Apps.openWriteSettings(ctx)
+            }
+            ChoiceRow("Launcher par défaut", "Ouvrir") { Apps.openHomeSettings(ctx) }
             ChoiceRow("Paramètres Android", "Ouvrir") { Apps.openSystemSettings(ctx) }
+        }
+
+        Section("À propos") {
+            Label("DriveHome ${appVersion(ctx)} — launcher de conduite pour autoradio Android.")
         }
 
         Spacer(Modifier.height(24.dp))
@@ -200,7 +419,7 @@ fun SettingsScreen(state: AppState) {
             allowAuto = true,
             onDismiss = { picker = null },
         ) { res ->
-            pf.setNavApp(res.firstOrNull() ?: "")
+            pf.navApp = res.firstOrNull() ?: ""
             picker = null
         }
 
@@ -212,7 +431,7 @@ fun SettingsScreen(state: AppState) {
             allowAuto = true,
             onDismiss = { picker = null },
         ) { res ->
-            pf.setMusicApp(res.firstOrNull() ?: "")
+            pf.musicApp = res.firstOrNull() ?: ""
             picker = null
         }
 
@@ -241,6 +460,12 @@ fun SettingsScreen(state: AppState) {
     }
 }
 
+private fun appVersion(ctx: android.content.Context): String = try {
+    ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: ""
+} catch (e: Exception) {
+    ""
+}
+
 // ---------------------------------------------------------------------------
 // Éléments de mise en page
 // ---------------------------------------------------------------------------
@@ -256,14 +481,18 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            title,
-            color = MaterialTheme.colorScheme.primary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        Text(title, color = MaterialTheme.colorScheme.primary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         content()
     }
+}
+
+@Composable
+private fun ScrollRow(content: @Composable () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) { content() }
 }
 
 @Composable
@@ -274,12 +503,39 @@ private fun Label(text: String) {
 @Composable
 private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val p = LocalPalette.current
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = p.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun SliderPref(label: String, value: Int, min: Int, max: Int, unit: String, onChange: (Int) -> Unit) {
+    Column {
+        Label("$label : $value $unit")
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onChange(it.toInt()) },
+            valueRange = min.toFloat()..max.toFloat(),
+        )
+    }
+}
+
+@Composable
+private fun Stepper(label: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+    val p = LocalPalette.current
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = p.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        RoundButton(onClick = onMinus, size = 42.dp) { Text("−", color = p.text, fontSize = 22.sp) }
+        Text(
+            value,
+            color = p.text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.width(120.dp).padding(horizontal = 8.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        RoundButton(onClick = onPlus, size = 42.dp) { Text("+", color = p.text, fontSize = 22.sp) }
     }
 }
 
@@ -295,13 +551,8 @@ private fun ChoiceRow(label: String, value: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = p.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
-        Text(
-            value,
-            color = p.sub,
-            fontSize = 15.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Spacer(Modifier.width(10.dp))
+        Text(value, color = MaterialTheme.colorScheme.primary, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -381,12 +632,7 @@ private fun PickerRow(
             Spacer(Modifier.size(36.dp))
         }
         Spacer(Modifier.width(12.dp))
-        Text(
-            label,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Text(label, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (multi) {
             Checkbox(checked = checked, onCheckedChange = { onClick() })
         } else if (checked) {

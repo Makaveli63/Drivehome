@@ -5,6 +5,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,15 +50,23 @@ fun DrawerScreen(state: AppState) {
     val favorites = state.prefs.favorites ?: emptyList()
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            singleLine = true,
-            placeholder = { Text("Rechercher une application") },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            shape = RoundedCornerShape(50),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
+                placeholder = { Text("Rechercher une application (${state.visibleApps.size})") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(10.dp))
+            Pill(
+                if (state.prefs.drawerSort == 1) "Plus utilisées" else "A → Z",
+                false,
+                { state.prefs.drawerSort = if (state.prefs.drawerSort == 1) 0 else 1 },
+            )
+        }
         Spacer(Modifier.height(12.dp))
 
         LazyVerticalGrid(
@@ -72,22 +82,24 @@ fun DrawerScreen(state: AppState) {
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
                             .combinedClickable(
-                                onClick = { Apps.launch(ctx, app.pkg) },
+                                onClick = { state.launch(app.pkg) },
                                 onLongClick = { menuFor = app.pkg },
                             )
                             .padding(10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         AppIcon(app.pkg, (68 * scale).dp)
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            app.label,
-                            color = p.text,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
+                        if (state.prefs.drawerLabels) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                app.label,
+                                color = p.text,
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
 
                     DropdownMenu(
@@ -102,6 +114,20 @@ fun DrawerScreen(state: AppState) {
                             },
                             onClick = {
                                 state.toggleFavorite(app.pkg)
+                                menuFor = null
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Définir comme appli de navigation") },
+                            onClick = {
+                                state.prefs.navApp = app.pkg
+                                menuFor = null
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Définir comme appli de musique") },
+                            onClick = {
+                                state.prefs.musicApp = app.pkg
                                 menuFor = null
                             },
                         )

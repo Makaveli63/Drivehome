@@ -56,6 +56,7 @@ fun AppIcon(pkg: String, size: Dp, modifier: Modifier = Modifier) {
 @Composable
 fun CardShell(
     modifier: Modifier = Modifier,
+    tint: Color = Color.Transparent,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val p = LocalPalette.current
@@ -63,7 +64,8 @@ fun CardShell(
         modifier
             .clip(RoundedCornerShape(28.dp))
             .background(p.card)
-            .padding(20.dp),
+            .background(tint)
+            .padding(18.dp),
         content = content,
     )
 }
@@ -243,4 +245,51 @@ fun MicGlyph(color: Color, size: Dp = 28.dp) {
             cap = StrokeCap.Round,
         )
     }
+}
+
+@Composable
+fun SlidersGlyph(color: Color, size: Dp = 28.dp) {
+    Canvas(Modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val sw = w * 0.08f
+        listOf(0.25f to 0.35f, 0.5f to 0.65f, 0.75f to 0.45f).forEach { (x, knob) ->
+            drawLine(color, Offset(w * x, h * 0.1f), Offset(w * x, h * 0.9f), strokeWidth = sw, cap = StrokeCap.Round)
+            drawCircle(color, radius = w * 0.11f, center = Offset(w * x, h * knob))
+        }
+    }
+}
+
+/** En-tête de carte : icône d'appli (optionnelle) + titre + action à droite. */
+@Composable
+fun CardHeader(
+    title: String,
+    pkg: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val p = LocalPalette.current
+    androidx.compose.foundation.layout.Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(bottom = 6.dp),
+    ) {
+        if (pkg != null) {
+            AppIcon(pkg, 32.dp)
+            androidx.compose.foundation.layout.Spacer(Modifier.size(10.dp))
+        }
+        Text(
+            title,
+            color = p.text,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        if (trailing != null) trailing()
+    }
+}
+
+/** Petit bouton texte arrondi. */
+@Composable
+fun SmallAction(text: String, onClick: () -> Unit, highlight: Boolean = false) {
+    Pill(text, highlight, onClick, Modifier)
 }

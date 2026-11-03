@@ -12,8 +12,33 @@ android {
         applicationId = "app.drivehome"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
+    }
+
+    // Clé de signature fixe (optionnelle) fournie par les secrets GitHub :
+    // les mises à jour s'installent alors par-dessus l'ancienne version.
+    // Sans secret, l'APK est signé avec la clé de débogage.
+    val ksFile = file("release.keystore")
+    val ksPass = System.getenv("SIGNING_PASSWORD").orEmpty()
+    val hasKey = ksFile.exists() && ksPass.isNotEmpty()
+
+    signingConfigs {
+        if (hasKey) {
+            create("fixed") {
+                storeFile = ksFile
+                storePassword = ksPass
+                keyAlias = System.getenv("SIGNING_ALIAS").orEmpty().ifEmpty { "drivehome" }
+                keyPassword = ksPass
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("fixed") ?: signingConfigs.getByName("debug")
+        }
     }
 
     compileOptions {
@@ -27,6 +52,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 

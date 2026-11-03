@@ -2,12 +2,16 @@ package app.drivehome
 
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.audiofx.AudioEffect
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import java.util.concurrent.ConcurrentHashMap
 
@@ -84,13 +88,92 @@ object Apps {
         }
     }
 
-    fun voiceAssistant(context: Context) {
-        val intent = Intent(Intent.ACTION_VOICE_COMMAND).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    /** Recherche à proximité (station, parking…) dans l'appli de navigation. */
+    fun searchNearby(context: Context, navPkg: String?, query: String) {
+        val uri = if (navPkg == "com.waze") {
+            Uri.parse("waze://?q=${Uri.encode(query)}")
+        } else {
+            Uri.parse("geo:0,0?q=${Uri.encode(query)}")
+        }
+        val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (navPkg != null) intent.setPackage(navPkg)
+        try {
+            context.startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            intent.setPackage(null)
+            safeStart(context, intent)
+        }
+    }
+
+    /** Appelle directement si l'autorisation est donnée, sinon ouvre le clavier du téléphone. */
+    fun call(context: Context, number: String) {
+        val uri = Uri.parse("tel:" + Uri.encode(number.trim()))
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) ==
+            PackageManager.PERMISSION_GRANTED
+        val intent = Intent(if (granted) Intent.ACTION_CALL else Intent.ACTION_DIAL, uri)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
-            toast(context, "Aucun assistant vocal disponible")
+            safeStart(context, Intent(Intent.ACTION_DIAL, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
+    }
+
+    fun hasCallPermission(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) ==
+            PackageManager.PERMISSION_GRANTED
+
+    fun openDialer(context: Context) {
+        safeStart(context, Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    fun openWifi(context: Context) =
+        safeStart(context, Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+    fun openBluetooth(context: Context) =
+        safeStart(context, Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+    fun openDisplay(context: Context) =
+        safeStart(context, Intent(Settings.ACTION_DISPLAY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+    fun openSound(context: Context) =
+        safeStart(context, Intent(Settings.ACTION_SOUND_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+    fun openLocationSettings(context: Context) =
+        safeStart(context, Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+    fun openEqualizer(context: Context) {
+        val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+            .putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            toast(context, "Aucun égaliseur sur cet appareil")
+        }
+    }
+
+    fun openWriteSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + context.packageName))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        safeStart(context, intent)
+    }
+
+    fun voiceAssistant(context: Context) {
+        val candidates = listOf(
+            Intent(Intent.ACTION_VOICE_COMMAND),
+            Intent("android.intent.action.ASSIST"),
+            Intent(android.speech.RecognizerIntent.ACTION_WEB_SEARCH),
+        )
+        for (i in candidates) {
+            try {
+                context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return
+            } catch (e: Exception) {
+                // on essaie le suivant
+            }
+        }
+        toast(context, "Aucun assistant vocal disponible")
     }
 
     fun openAppInfo(context: Context, pkg: String) {
