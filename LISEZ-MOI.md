@@ -103,3 +103,11 @@ dock pour la déplacer ou la retirer ; boutons fixes masquables.
 ## Si la compilation échoue
 
 Copie le message d'erreur du job GitHub Actions et envoie-le à Claude pour correction.
+
+## Crédits
+
+- Modèle 3D « Volkswagen Passat B8 Variant R-Line 2015 » par **Nieve5677** —
+  https://sketchfab.com/3d-models/volkswagen-passat-b8-variant-r-line-2015-41af8da6d8054229ba1f462cd25ba0b4 —
+  licence [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/).
+  Modifications : matières recréées (carrosserie blanche, vitres, jantes, pneus, chromes, feux),
+  maillage allégé (≈394 k → 177 k triangles), plaques DS-241-FV ajoutées.

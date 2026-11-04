@@ -37,7 +37,15 @@ enum class CarPart(val key: String, val label: String) {
 object Car3D {
     fun file(ctx: Context) = File(ctx.filesDir, "car_model.glb")
 
-    fun exists(ctx: Context): Boolean = file(ctx).let { it.exists() && it.length() > 20 }
+    /** Modèle importé par l'utilisateur (remplace le modèle intégré). */
+    fun hasImported(ctx: Context): Boolean = file(ctx).let { it.exists() && it.length() > 20 }
+
+    /** Un modèle est toujours disponible : la Passat B8 Variant est intégrée à l'appli. */
+    fun exists(ctx: Context): Boolean = true
+
+    const val BUILTIN = "models/passat_b8.glb"
+    const val CREDIT = "Modèle 3D « Volkswagen Passat B8 Variant R-Line 2015 » par Nieve5677 (Sketchfab), " +
+        "licence CC BY 4.0 — matières, allègement et plaque DS-241-FV ajoutés pour DriveHome."
 
     /** Copie le fichier choisi par l'utilisateur ; vérifie l'en-tête « glTF ». */
     fun import(ctx: Context, uri: Uri): String? {
@@ -109,14 +117,19 @@ fun Car3DView(
     val modelLoader = rememberModelLoader(engine)
     val centerNode = rememberNode(engine)
     val cameraNode = rememberCameraNode(engine) {
-        position = Position(x = 2.4f, y = 1.3f, z = 3.2f)
+        // vue 3/4 avant (l'avant du modèle est côté -X)
+        position = Position(x = -3.0f, y = 1.0f, z = 2.3f)
         lookAt(centerNode)
     }
 
     val modelNode: ModelNode? = remember(modelVersion) {
         try {
             ModelNode(
-                modelInstance = modelLoader.createModelInstance(Car3D.file(ctx)),
+                modelInstance = if (Car3D.hasImported(ctx)) {
+                    modelLoader.createModelInstance(Car3D.file(ctx))
+                } else {
+                    modelLoader.createModelInstance(Car3D.BUILTIN)
+                },
                 scaleToUnits = 2.4f,
                 centerOrigin = Position(x = 0f, y = 0f, z = 0f),
             )
@@ -179,6 +192,19 @@ fun Car3DView(
     apply(CarPart.RR, rr)
     apply(CarPart.TRUNK, tr)
     apply(CarPart.HOOD, hd)
+
+    // tuile d'accueil : la voiture tourne doucement sur elle-même
+    LaunchedEffect(modelNode, interactive) {
+        val node = modelNode ?: return@LaunchedEffect
+        if (interactive) return@LaunchedEffect
+        val base = node.rotation
+        var a = 0f
+        while (true) {
+            a = (a + 0.4f) % 360f
+            node.rotation = base + Rotation(y = a)
+            kotlinx.coroutines.delay(33)
+        }
+    }
 
     val manipulator = rememberCameraManipulator(
         orbitHomePosition = cameraNode.worldPosition,

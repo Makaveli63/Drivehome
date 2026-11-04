@@ -226,7 +226,7 @@ fun CarVisual(state: AppState, modifier: Modifier, interactive: Boolean, onParts
     val has3d = remember(pf.car3dVersion) { Car3D.exists(ctx) }
     if (pf.carView == 3) {
         CarPhotosView(modifier, interactive)
-    } else if ((pf.carView == 4 || pf.use3d) && has3d) {
+    } else if (pf.carView == 4 && has3d) {
         Box(modifier) {
             Car3DView(
                 state.car.doors,
@@ -607,7 +607,9 @@ private fun Model3DPanel(state: AppState, partNames: List<String>) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             CardHeader("Modèle 3D de la voiture")
             Text(
-                if (has3d) "Modèle importé ✓ — glisse pour tourner, pince pour zoomer."
+                if (Car3D.hasImported(ctx)) "Modèle importé ✓ — glisse pour tourner, pince pour zoomer."
+                else if (has3d) "Ta Passat B8 Variant blanche est intégrée en 3D ✓ — glisse pour tourner, pince pour zoomer. " +
+                    "Tu peux aussi importer un autre modèle .glb."
                 else "Importe un vrai modèle 3D de ta voiture au format .glb (Sketchfab, CGTrader, RenderHub…). " +
                     "Copie-le sur une clé USB ou dans Téléchargements, puis touche « Importer ».",
                 color = p.sub,
@@ -624,12 +626,13 @@ private fun Model3DPanel(state: AppState, partNames: List<String>) {
                 if (has3d) {
                     Pill(if (pf.use3d) "Afficher : 3D" else "Afficher : dessin", pf.use3d, { pf.use3d = !pf.use3d })
                     Pill(if (pf.car3dOnHome) "3D sur l'accueil : oui" else "3D sur l'accueil : non", false, { pf.car3dOnHome = !pf.car3dOnHome })
-                    Pill("Supprimer", false, {
+                    if (Car3D.hasImported(ctx)) Pill("Revenir au modèle intégré", false, {
                         Car3D.delete(ctx)
                         pf.car3dVersion = System.currentTimeMillis()
                     })
                 }
             }
+            Text(Car3D.CREDIT, color = p.sub, fontSize = 11.sp)
             if (has3d && pf.use3d) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Repeindre la carrosserie", color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
