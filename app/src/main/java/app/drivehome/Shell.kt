@@ -312,13 +312,104 @@ fun Shell(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
 
 @Composable
 fun ScreenContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<String>) -> Unit) {
-    when (state.screen) {
-        Screen.Home -> HomeContent(state, wide, onRequestPermissions)
-        Screen.Car -> CarScreen(state, onRequestPermissions)
-        Screen.Drawer -> DrawerScreen(state)
-        Screen.Phone -> PhoneScreen(state, onRequestPermissions)
-        Screen.Messages -> MessagesScreen(state)
-        Screen.Settings -> SettingsScreen(state, onRequestPermissions)
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (state.screen) {
+                Screen.Home -> HomeContent(state, wide, onRequestPermissions)
+                Screen.Car -> CarScreen(state, onRequestPermissions)
+                Screen.Drawer -> DrawerScreen(state)
+                Screen.Phone -> PhoneScreen(state, onRequestPermissions)
+                Screen.Messages -> MessagesScreen(state)
+                Screen.Settings -> SettingsScreen(state, onRequestPermissions)
+            }
+        }
+        if (state.prefs.miniPlayer && state.screen != Screen.Settings) MiniPlayer(state)
+    }
+}
+
+/** Barre de musique en bas de l'écran : pochette, titre, progression, commandes. */
+@Composable
+fun MiniPlayer(state: AppState) {
+    val ctx = LocalContext.current
+    val p = LocalPalette.current
+    val m = state.media.info
+    val musicPkg = state.musicPackage()
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+    val accent = MaterialTheme.colorScheme.primary
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(p.card),
+    ) {
+        // progression
+        if (m.hasSession && m.duration > 0) {
+            @Suppress("UNUSED_VARIABLE") val tick = state.now
+            val frac = (m.currentPosition().toFloat() / m.duration).coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth().height(3.dp).background(p.chip)) {
+                Box(Modifier.fillMaxWidth(frac).height(3.dp).background(accent))
+            }
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(66.dp)
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // pochette (ou icône de l'appli) — appui : ouvre l'appli de musique
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable {
+                        val pkg = m.pkg ?: musicPkg
+                        if (pkg != null) state.launch(pkg) else Apps.toast(ctx, "Aucune application de musique trouvée")
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(50.dp).clip(RoundedCornerShape(10.dp)).background(p.chip),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val art = m.art
+                    if (art != null) {
+                        Image(art.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    } else {
+                        (m.pkg ?: musicPkg)?.let { AppIcon(it, 38.dp) }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (m.hasSession) (m.title ?: "Lecture en cours") else "Rien en lecture",
+                        color = p.text,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val sub = if (m.hasSession) listOfNotNull(m.artist, m.album).filter { it.isNotEmpty() }.joinToString(" · ")
+                    else if (!m.access) "Autorise l'accès aux notifications" else state.labelOf(musicPkg)
+                    if (sub.isNotEmpty()) {
+                        Text(sub, color = p.sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            if (m.sources.size > 1) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp)).clickable { state.media.nextSource() }.padding(4.dp),
+                ) { m.pkg?.let { AppIcon(it, 30.dp) } }
+            }
+            RoundButton(onClick = { state.media.previous() }, size = 48.dp) { PrevGlyph(p.text, 20.dp) }
+            RoundButton(onClick = { if (m.hasSession) state.media.playPause() else state.media.resume() }, size = 56.dp, filled = true) {
+                if (m.playing) PauseGlyph(onPrimary, 22.dp) else PlayGlyph(onPrimary, 22.dp)
+            }
+            RoundButton(onClick = { state.media.next() }, size = 48.dp) { NextGlyph(p.text, 20.dp) }
+        }
     }
 }
 

@@ -110,6 +110,8 @@ class Prefs(context: Context) {
     /** 0 = gauche, 1 = droite, 2 = bas. */
     var dockPos by IntPref("dockPos", 0)
     var showStatusBar by BoolPref("showStatusBar", true)
+    /** Barre de commandes musique en bas de l'écran. */
+    var miniPlayer by BoolPref("miniPlayer", true)
     var fullscreen by BoolPref("fullscreen", false)
     var keepScreenOn by BoolPref("keepScreenOn", true)
     var clock24 by BoolPref("clock24", true)

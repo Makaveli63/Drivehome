@@ -159,6 +159,7 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
                 Pill("Bas", pf.dockPos == 2, { pf.dockPos = 2 })
             }
             SwitchRow("Barre d'état (heure, météo, batterie)", pf.showStatusBar) { pf.showStatusBar = it }
+            SwitchRow("Barre de musique en bas de l'écran", pf.miniPlayer) { pf.miniPlayer = it }
             SwitchRow("Plein écran (masquer les barres Android)", pf.fullscreen) { pf.fullscreen = it }
             SwitchRow("Garder l'écran allumé", pf.keepScreenOn) { pf.keepScreenOn = it }
             SwitchRow("Horloge 24 heures", pf.clock24) { pf.clock24 = it }
