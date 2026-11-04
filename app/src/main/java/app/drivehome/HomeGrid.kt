@@ -114,6 +114,10 @@ fun AppState.moveCardTo(c: CardType, target: CardType) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<String>) -> Unit) {
+    if (wide && state.prefs.homeLayout == 1) {
+        CarPlayDashboard(state)
+        return
+    }
     val p = LocalPalette.current
     val pf = state.prefs
     val cards = state.enabledCards()

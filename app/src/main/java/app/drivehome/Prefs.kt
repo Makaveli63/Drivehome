@@ -124,6 +124,10 @@ class Prefs(context: Context) {
     private var cardSizesRaw by StrPref("cardSizes", "")
     /** Grille de l'accueil en mode paysage. */
     var homeCols by IntPref("homeCols", 4)
+    /** Accueil : 1 = tableau de bord façon CarPlay, 0 = tuiles libres. */
+    var homeLayout by IntPref("homeLayout", 1)
+    /** Heure en pastille en haut du dock (style CarPlay). */
+    var dockClock by BoolPref("dockClock", true)
     var homeRows by IntPref("homeRows", 2)
 
     val cardOrder: List<CardType>

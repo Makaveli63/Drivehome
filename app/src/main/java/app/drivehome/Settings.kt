@@ -207,6 +207,15 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
         }
 
         // -------------------------------------------------------------- Accueil
+        Section("Disposition de l'accueil") {
+            ScrollRow {
+                Pill("Tableau de bord (style CarPlay)", pf.homeLayout == 1, { pf.homeLayout = 1 })
+                Pill("Tuiles libres", pf.homeLayout == 0, { pf.homeLayout = 0 })
+            }
+            Label("Style CarPlay : grande carte en direct, guidage et lecture en cours à droite.")
+            SwitchRow("Heure en haut du dock", pf.dockClock) { pf.dockClock = it }
+        }
+
         Section("Tuiles de l'accueil") {
             Label("Astuce : sur l'accueil, touche « ✎ Modifier » pour redimensionner, déplacer, ajouter ou retirer les tuiles directement.")
             Stepper("Colonnes (paysage)", "${pf.homeCols}", { pf.homeCols = (pf.homeCols - 1).coerceAtLeast(2) }, { pf.homeCols = (pf.homeCols + 1).coerceAtMost(6) })

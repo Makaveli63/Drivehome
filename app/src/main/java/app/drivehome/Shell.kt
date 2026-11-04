@@ -135,7 +135,8 @@ fun Root(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
     ) {
         WallpaperLayer(state)
         Column(Modifier.fillMaxSize()) {
-            if (pf.showStatusBar) StatusBar(state)
+            val dashboard = pf.homeLayout == 1 && state.screen == Screen.Home
+            if (pf.showStatusBar && !dashboard) StatusBar(state)
             Box(Modifier.weight(1f).fillMaxWidth()) { Shell(state, onRequestPermissions) }
         }
 
@@ -323,7 +324,8 @@ fun ScreenContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<S
                 Screen.Settings -> SettingsScreen(state, onRequestPermissions)
             }
         }
-        if (state.prefs.miniPlayer && state.screen != Screen.Settings) MiniPlayer(state)
+        val onDashboard = state.prefs.homeLayout == 1 && wide && state.screen == Screen.Home
+        if (state.prefs.miniPlayer && state.screen != Screen.Settings && !onDashboard) MiniPlayer(state)
     }
 }
 
@@ -439,6 +441,17 @@ fun Dock(state: AppState, vertical: Boolean) {
     }
 
     val head: @Composable () -> Unit = {
+        if (pf.dockClock && vertical) {
+            val t = java.text.SimpleDateFormat(if (pf.clock24) "HH:mm" else "h:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(state.now))
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            ) { Text(t, color = onPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            if (state.batteryLevel >= 0) BatteryGlyph(state.batteryLevel, state.charging, p.text)
+        }
         ScreenButton(Screen.Home) { Icon(Icons.Filled.Home, contentDescription = "Accueil", tint = it) }
         if (pf.dockCar) {
             ScreenButton(Screen.Car) { CarGlyph(it, state.car.doors.anyOpen()) }
