@@ -83,19 +83,52 @@ fun NavCard(state: AppState, modifier: Modifier) {
     val pf = state.prefs
     var search by remember { mutableStateOf(false) }
 
-    CardShell(modifier) {
-        // décor façon carte routière
-        Canvas(Modifier.matchParentSize()) {
-            val w = this.size.width
-            val h = this.size.height
-            val road = accent.copy(alpha = 0.12f)
-            drawLine(road, Offset(0f, h * 0.78f), Offset(w, h * 0.30f), strokeWidth = 30f, cap = StrokeCap.Round)
-            drawLine(road, Offset(w * 0.28f, 0f), Offset(w * 0.58f, h), strokeWidth = 20f, cap = StrokeCap.Round)
-            val curve = Path().apply {
-                moveTo(0f, h * 0.22f)
-                cubicTo(w * 0.30f, h * 0.05f, w * 0.52f, h * 0.55f, w, h * 0.62f)
+    val nav = NotifStore.nav
+    CardShell(modifier, background = {
+        // carte en direct en fond de tuile
+        if (pf.liveMap) {
+            Box(Modifier.matchParentSize()) {
+                LiveMap(state, Modifier.fillMaxSize())
+                Box(
+                    Modifier.fillMaxSize().background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = if (p.night) 0.55f else 0.25f), Color.Transparent, Color.Black.copy(alpha = if (p.night) 0.65f else 0.35f)),
+                        ),
+                    ),
+                )
+                // la carte n'est pas manipulable : un appui ouvre l'appli de navigation
+                Box(
+                    Modifier.fillMaxSize().clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                    ) { navPkg?.let { state.launch(it) } },
+                )
             }
-            drawPath(curve, road, style = Stroke(width = 14f, cap = StrokeCap.Round))
+        } else {
+            Canvas(Modifier.matchParentSize()) {
+                val w = this.size.width
+                val h = this.size.height
+                val road = accent.copy(alpha = 0.12f)
+                drawLine(road, Offset(0f, h * 0.78f), Offset(w, h * 0.30f), strokeWidth = 30f, cap = StrokeCap.Round)
+                drawLine(road, Offset(w * 0.28f, 0f), Offset(w * 0.58f, h), strokeWidth = 20f, cap = StrokeCap.Round)
+            }
+        }
+    }) {
+
+        if (nav != null) {
+            // ---- guidage en cours, façon CarPlay
+            Column(Modifier.fillMaxSize()) {
+                GuidanceBanner(nav)
+                Spacer(Modifier.weight(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = { state.launch(nav.pkg) },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(50),
+                    ) { Text("Ouvrir le guidage", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+                }
+            }
+            return@CardShell
         }
 
         Column(Modifier.fillMaxSize()) {

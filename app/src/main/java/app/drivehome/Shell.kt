@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -461,20 +462,9 @@ fun Dock(state: AppState, vertical: Boolean) {
     }
 
     if (addDialog) {
-        AppPickerDialog(
-            title = "Applications du dock",
-            apps = state.apps,
-            selected = pf.favorites ?: emptyList(),
-            multi = true,
-            max = AppState.MAX_FAVORITES,
-            onDismiss = { addDialog = false },
-            onChange = { pf.setFavorites(it) },
-        ) { res ->
-            pf.setFavorites(res)
-            addDialog = false
-            Apps.toast(ctx, "Dock mis à jour (${res.size} app(s))")
-        }
+        DockManagerDialog(state) { addDialog = false }
     }
+}
 }
 
 /** Petite silhouette de voiture (point orange si un ouvrant est ouvert). */
@@ -717,3 +707,61 @@ fun Screensaver(state: AppState) {
 
 /** Taille utilitaire pour les icônes de cartes. */
 val CardIconSize: Dp = 34.dp
+
+/** Gestion du dock : ordre (↑ ↓), retrait (✕) et ajout d'applis. */
+@Composable
+fun DockManagerDialog(state: AppState, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val pf = state.prefs
+    var picking by remember { mutableStateOf(false) }
+    val favs = (pf.favorites ?: emptyList()).filter { f -> state.apps.any { it.pkg == f } }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Applis du dock") },
+        text = {
+            Column {
+                if (favs.isEmpty()) {
+                    Text("Aucune appli dans le dock. Touche « + Ajouter des applis ».")
+                }
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 380.dp)) {
+                    items(favs.size, key = { favs[it] }) { i ->
+                        val pkg = favs[i]
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            AppIcon(pkg, 40.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text(state.labelOf(pkg), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            androidx.compose.material3.IconButton(onClick = { state.moveFavorite(pkg, -1) }, enabled = i > 0) {
+                                Text("▲", fontSize = 18.sp)
+                            }
+                            androidx.compose.material3.IconButton(onClick = { state.moveFavorite(pkg, 1) }, enabled = i < favs.lastIndex) {
+                                Text("▼", fontSize = 18.sp)
+                            }
+                            androidx.compose.material3.IconButton(onClick = {
+                                state.toggleFavorite(pkg)
+                                Apps.toast(ctx, "${state.labelOf(pkg)} retiré du dock")
+                            }) { Text("✕", fontSize = 18.sp, color = DANGER) }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Terminé") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = { picking = true }) { Text("+ Ajouter des applis") } },
+    )
+
+    if (picking) {
+        AppPickerDialog(
+            title = "Ajouter au dock",
+            apps = state.apps,
+            selected = pf.favorites ?: emptyList(),
+            multi = true,
+            max = AppState.MAX_FAVORITES,
+            onDismiss = { picking = false },
+            onChange = { pf.setFavorites(it) },
+        ) { res ->
+            pf.setFavorites(res)
+            picking = false
+        }
+    }
+}

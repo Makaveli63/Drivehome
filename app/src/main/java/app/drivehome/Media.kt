@@ -15,6 +15,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.speech.tts.TextToSpeech
 import android.view.KeyEvent
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,9 @@ object NotifStore {
     val messages = mutableStateListOf<Msg>()
     var connected by mutableStateOf(false)
     var service: MediaListener? = null
+
+    /** Guidage de navigation en cours (null si aucun). */
+    var nav by mutableStateOf<NavInfo?>(null)
 
     /** Appelé pour chaque nouveau message (lecture vocale, etc.). */
     var onNew: ((Msg) -> Unit)? = null
@@ -109,12 +113,39 @@ class MediaListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         NotifStore.remove(sbn.key)
+        if (NotifStore.nav?.key == sbn.key) NotifStore.nav = null
+    }
+
+    /** Notification de guidage (Waze, Google Maps…) : on garde distance, instruction et flèche. */
+    private fun handleNavigation(sbn: StatusBarNotification, n: Notification): Boolean {
+        val isNavApp = sbn.packageName in Apps.NAV_PKGS
+        if (!(isNavApp && sbn.isOngoing) && n.category != Notification.CATEGORY_NAVIGATION) return false
+        val ex = n.extras ?: return true
+        val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty()
+        val text = (ex.getCharSequence(Notification.EXTRA_TEXT) ?: ex.getCharSequence(Notification.EXTRA_BIG_TEXT))
+            ?.toString()?.trim().orEmpty()
+        val sub = (ex.getCharSequence(Notification.EXTRA_SUB_TEXT) ?: ex.getCharSequence(Notification.EXTRA_INFO_TEXT))
+            ?.toString()?.trim().orEmpty()
+        if (title.isEmpty() && text.isEmpty()) return true
+        val icon = try {
+            n.getLargeIcon()?.loadDrawable(this)?.let { d ->
+                val w = d.intrinsicWidth.coerceIn(48, 256)
+                val h = d.intrinsicHeight.coerceIn(48, 256)
+                d.toBitmap(w, h)
+            }
+        } catch (e: Exception) {
+            null
+        }
+        NotifStore.nav = NavInfo(sbn.key, sbn.packageName, title, text, sub, icon, sbn.postTime)
+        return true
     }
 
     private fun handle(sbn: StatusBarNotification, isNew: Boolean) {
         try {
-            if (sbn.packageName == packageName || sbn.isOngoing) return
+            if (sbn.packageName == packageName) return
             val n = sbn.notification ?: return
+            if (handleNavigation(sbn, n)) return
+            if (sbn.isOngoing) return
             if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
             if (n.category in ignoredCategories) return
             val ex = n.extras ?: return

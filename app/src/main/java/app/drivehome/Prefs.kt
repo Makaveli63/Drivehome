@@ -255,6 +255,8 @@ class Prefs(context: Context) {
     // ---- Navigation -------------------------------------------------------------
 
     var homeAddr by StrPref("homeAddr", "")
+    /** Carte OpenStreetMap en direct dans la tuile Navigation. */
+    var liveMap by BoolPref("liveMap", true)
     var workAddr by StrPref("workAddr", "")
     private var placesRaw by StrPref("places", "")
 

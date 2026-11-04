@@ -12,8 +12,8 @@ android {
         applicationId = "app.drivehome"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "2.3"
+        versionCode = 6
+        versionName = "2.4"
     }
 
     // Clé de signature fixe (optionnelle) fournie par les secrets GitHub :
@@ -81,4 +81,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     // Moteur 3D (Filament) pour afficher le vrai modèle de la voiture
     implementation("io.github.sceneview:sceneview:2.2.1")
+    // Carte en direct (OpenStreetMap)
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 }

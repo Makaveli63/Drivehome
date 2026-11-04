@@ -382,7 +382,7 @@ private fun CarPanels(state: AppState, onRequestPermissions: (Array<String>) -> 
                 "Accélérateur" to o.throttle?.let { "$it %" },
                 "Air admission" to o.intake?.let { "$it °C" },
             )
-            tiles.chunked(3).forEach { row ->
+            tiles.filter { it.second != null }.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { (label, value) ->
                         Column(
@@ -396,7 +396,9 @@ private fun CarPanels(state: AppState, onRequestPermissions: (Array<String>) -> 
             }
             if (!connected) {
                 Text(
-                    "Les valeurs moteur s'affichent avec un boîtier OBD2 Bluetooth (ELM327, ~15 €) branché sous le volant.",
+                    "Régime, températures, tension batterie, carburant, charge moteur… : ces infos ne sont pas transmises " +
+                        "aux applis par l'autoradio. Pour les afficher, branche un boîtier OBD2 Bluetooth (ELM327, ~15 €) " +
+                        "sur la prise OBD sous le volant, puis touche « Choisir le boîtier » ci-dessous.",
                     color = p.sub,
                     fontSize = 13.sp,
                 )

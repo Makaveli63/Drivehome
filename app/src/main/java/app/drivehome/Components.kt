@@ -57,6 +57,7 @@ fun AppIcon(pkg: String, size: Dp, modifier: Modifier = Modifier) {
 fun CardShell(
     modifier: Modifier = Modifier,
     tint: Color = Color.Transparent,
+    background: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val p = LocalPalette.current
@@ -64,10 +65,11 @@ fun CardShell(
         modifier
             .clip(RoundedCornerShape(28.dp))
             .background(p.card)
-            .background(tint)
-            .padding(18.dp),
-        content = content,
-    )
+            .background(tint),
+    ) {
+        if (background != null) Box(Modifier.matchParentSize(), content = background)
+        Box(Modifier.padding(18.dp), content = content)
+    }
 }
 
 /** Pastille de choix (remplace les chips pour rester sur des API stables). */

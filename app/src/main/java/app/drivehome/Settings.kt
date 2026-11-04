@@ -247,6 +247,8 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
 
         // --------------------------------------------------------- Conduite
         Section("Conduite & météo") {
+            SwitchRow("Carte en direct dans la tuile Navigation (OpenStreetMap)", pf.liveMap) { pf.liveMap = it }
+            Label("Pendant un guidage Waze / Google Maps, la tuile affiche la prochaine manœuvre (accès aux notifications requis).")
             Label("Unité de vitesse")
             ScrollRow {
                 Pill("km/h", pf.speedUnit == 0, { pf.speedUnit = 0 })
@@ -317,7 +319,7 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
             ChoiceRow(
                 "Applis du dock",
                 "${(pf.favorites ?: emptyList()).size} app(s)",
-            ) { picker = "dock" }
+            ) { picker = "dockManager" }
             ChoiceRow("Applications masquées", "${pf.hidden.size}") { picker = "hidden" }
             Label("Tri du tiroir d'applications")
             ScrollRow {
@@ -469,6 +471,7 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
     }
 
     // ------------------------------------------------------------- Sélecteurs
+    if (picker == "dockManager") DockManagerDialog(state) { picker = null }
     when (picker) {
         "nav" -> AppPickerDialog(
             title = "Application de navigation",
