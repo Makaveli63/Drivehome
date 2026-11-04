@@ -30,6 +30,7 @@ enum class CardType(val id: String, val label: String, val defW: Int, val defH: 
     MESSAGES("messages", "Messages", 2, 1),
     CONTACTS("contacts", "Contacts favoris", 2, 1),
     APPS("apps", "Raccourcis d'apps", 2, 1),
+    YOUTUBE("youtube", "YouTube", 2, 1),
     ;
 
     companion object {

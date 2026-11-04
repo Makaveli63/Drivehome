@@ -501,6 +501,7 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
             multi = true,
             max = AppState.MAX_FAVORITES,
             onDismiss = { picker = null },
+            onChange = { pf.setFavorites(it) },
         ) { res ->
             pf.setFavorites(res)
             picker = null
@@ -512,6 +513,7 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
             selected = pf.hidden,
             multi = true,
             onDismiss = { picker = null },
+            onChange = { pf.setHidden(it) },
         ) { res ->
             pf.setHidden(res)
             picker = null
@@ -624,6 +626,8 @@ fun AppPickerDialog(
     max: Int = Int.MAX_VALUE,
     allowAuto: Boolean = false,
     onDismiss: () -> Unit,
+    /** Appelé à chaque coche/décoche : les changements sont enregistrés tout de suite. */
+    onChange: ((List<String>) -> Unit)? = null,
     onResult: (List<String>) -> Unit,
 ) {
     var sel by remember { mutableStateOf(selected) }
@@ -652,6 +656,7 @@ fun AppPickerDialog(
                     ) {
                         if (multi) {
                             sel = if (app.pkg in sel) sel - app.pkg else (sel + app.pkg).takeLast(max)
+                            onChange?.invoke(sel)
                         } else {
                             onResult(listOf(app.pkg))
                         }
@@ -661,11 +666,11 @@ fun AppPickerDialog(
         },
         confirmButton = {
             if (multi) {
-                TextButton(onClick = { onResult(sel) }) { Text("OK") }
+                TextButton(onClick = { onResult(sel) }) { Text(if (onChange != null) "Terminé" else "OK") }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Annuler") }
+            if (onChange == null) TextButton(onClick = onDismiss) { Text("Annuler") }
         },
     )
 }

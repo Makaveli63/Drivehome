@@ -346,12 +346,15 @@ fun Dock(state: AppState, vertical: Boolean) {
         ) { content(if (sel) onPrimary else p.text) }
     }
 
-    val items: @Composable () -> Unit = {
+    val head: @Composable () -> Unit = {
         ScreenButton(Screen.Home) { Icon(Icons.Filled.Home, contentDescription = "Accueil", tint = it) }
         if (pf.dockCar) {
             ScreenButton(Screen.Car) { CarGlyph(it, state.car.doors.anyOpen()) }
         }
+    }
 
+    // zone défilante : applis du dock + bouton « + » + boutons optionnels
+    val middle: @Composable () -> Unit = {
         favorites.forEach { pkg ->
             Box {
                 Box(
@@ -383,6 +386,7 @@ fun Dock(state: AppState, vertical: Boolean) {
                         onClick = {
                             state.toggleFavorite(pkg)
                             menuFor = null
+                            Apps.toast(ctx, "${state.labelOf(pkg)} retiré du dock")
                         },
                     )
                     DropdownMenuItem(
@@ -395,7 +399,6 @@ fun Dock(state: AppState, vertical: Boolean) {
                 }
             }
         }
-
         if (pf.dockAdd) {
             RoundButton(onClick = { addDialog = true }, size = iconSize) {
                 Text("+", color = p.text, fontSize = 30.sp, fontWeight = FontWeight.Light)
@@ -404,19 +407,18 @@ fun Dock(state: AppState, vertical: Boolean) {
         if (pf.dockPhone) {
             ScreenButton(Screen.Phone) { Icon(Icons.Filled.Call, contentDescription = "Téléphone", tint = it) }
         }
-        ScreenButton(Screen.Drawer) { AppsGlyph(it) }
-
         if (pf.dockMic) {
-            RoundButton(onClick = { Apps.voiceAssistant(ctx) }, size = iconSize) {
-                MicGlyph(p.text)
-            }
+            RoundButton(onClick = { Apps.voiceAssistant(ctx) }, size = iconSize) { MicGlyph(p.text) }
         }
         if (pf.dockControl) {
             RoundButton(onClick = { state.controlCenter = true }, size = iconSize, filled = state.controlCenter) {
                 SlidersGlyph(if (state.controlCenter) onPrimary else p.text)
             }
         }
+    }
 
+    val tail: @Composable () -> Unit = {
+        ScreenButton(Screen.Drawer) { AppsGlyph(it) }
         ScreenButton(Screen.Settings) { Icon(Icons.Filled.Settings, contentDescription = "Réglages", tint = it) }
     }
 
@@ -426,22 +428,36 @@ fun Dock(state: AppState, vertical: Boolean) {
                 .fillMaxHeight()
                 .width(iconSize + 32.dp)
                 .background(p.dock)
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                .padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-        ) { items() }
+        ) {
+            head()
+            Column(
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) { middle() }
+            tail()
+        }
     } else {
         Row(
             Modifier
                 .fillMaxWidth()
                 .height(iconSize + 24.dp)
                 .background(p.dock)
-                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-        ) { items() }
+        ) {
+            head()
+            Row(
+                Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) { middle() }
+            tail()
+        }
     }
 
     if (addDialog) {
@@ -452,9 +468,11 @@ fun Dock(state: AppState, vertical: Boolean) {
             multi = true,
             max = AppState.MAX_FAVORITES,
             onDismiss = { addDialog = false },
+            onChange = { pf.setFavorites(it) },
         ) { res ->
             pf.setFavorites(res)
             addDialog = false
+            Apps.toast(ctx, "Dock mis à jour (${res.size} app(s))")
         }
     }
 }

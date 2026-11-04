@@ -39,6 +39,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
 
 /** Une tuile placée dans la grille d'une page. */
 data class Placed(val type: CardType, val col: Int, val row: Int, val w: Int, val h: Int)
@@ -90,6 +99,18 @@ fun AppState.moveCard(c: CardType, delta: Int) {
     prefs.setCardOrder(order)
 }
 
+/** Place la tuile [c] à l'emplacement de la tuile [target] (glisser-déposer). */
+fun AppState.moveCardTo(c: CardType, target: CardType) {
+    if (c == target) return
+    val order = prefs.cardOrder.toMutableList()
+    order.remove(c)
+    val j = order.indexOf(target)
+    val enabled = enabledCards()
+    val forward = enabled.indexOf(c) < enabled.indexOf(target)
+    order.add(if (forward) j + 1 else j, c)
+    prefs.setCardOrder(order)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<String>) -> Unit) {
@@ -104,7 +125,11 @@ fun HomeContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<Str
     val pager = rememberPagerState(pageCount = { pages.size })
 
     Column(Modifier.fillMaxSize()) {
-        HorizontalPager(state = pager, modifier = Modifier.weight(1f).fillMaxWidth()) { index ->
+        HorizontalPager(
+            state = pager,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            userScrollEnabled = !state.editHome,
+        ) { index ->
             val page = pages[index.coerceIn(0, pages.lastIndex)]
             if (page.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -145,7 +170,7 @@ fun HomeContent(state: AppState, wide: Boolean, onRequestPermissions: (Array<Str
             }
             if (!state.editHome) {
                 Text(
-                    "✎ Modifier",
+                    "✎ Modifier (ou appui long sur une tuile)",
                     color = p.sub,
                     fontSize = 13.sp,
                     modifier = Modifier.clip(RoundedCornerShape(50)).clickable { state.editHome = true }.padding(8.dp),
@@ -193,25 +218,102 @@ private fun PageGrid(
     rows: Int,
     onRequestPermissions: (Array<String>) -> Unit,
 ) {
+    var dragging by remember { mutableStateOf<CardType?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+
     BoxWithConstraints(Modifier.fillMaxSize().padding(12.dp)) {
         val gap = 12.dp
         val cw = (maxWidth - gap * (cols - 1)) / cols
         val ch = (maxHeight - gap * (rows - 1)) / rows
+        val cwPx = with(density) { (cw + gap).toPx() }
+        val chPx = with(density) { (ch + gap).toPx() }
+
         page.forEach { pl ->
+            val isDragged = dragging == pl.type
             Box(
                 Modifier
+                    .zIndex(if (isDragged) 10f else 0f)
                     .offset(x = (cw + gap) * pl.col, y = (ch + gap) * pl.row)
-                    .size(width = cw * pl.w + gap * (pl.w - 1), height = ch * pl.h + gap * (pl.h - 1)),
+                    .graphicsLayer {
+                        if (isDragged) {
+                            translationX = dragOffset.x
+                            translationY = dragOffset.y
+                            scaleX = 1.04f
+                            scaleY = 1.04f
+                            alpha = 0.92f
+                        }
+                    }
+                    .size(width = cw * pl.w + gap * (pl.w - 1), height = ch * pl.h + gap * (pl.h - 1))
+                    // appui long sur une tuile : passe en mode édition
+                    .pointerInput(state.editHome) {
+                        if (state.editHome) return@pointerInput
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            var cancelled = false
+                            withTimeoutOrNull(600L) {
+                                while (true) {
+                                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                    val c = ev.changes.firstOrNull { it.id == down.id }
+                                    if (c == null || !c.pressed ||
+                                        (c.position - down.position).getDistance() > viewConfiguration.touchSlop
+                                    ) {
+                                        cancelled = true
+                                        return@withTimeoutOrNull
+                                    }
+                                }
+                            }
+                            if (!cancelled) {
+                                state.editHome = true
+                                // avale le reste du geste pour ne pas ouvrir la tuile au relâchement
+                                do {
+                                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                    ev.changes.forEach { it.consume() }
+                                } while (ev.changes.any { it.pressed })
+                            }
+                        }
+                    },
             ) {
                 AnyCard(state, pl.type, Modifier.fillMaxSize(), onRequestPermissions)
-                if (state.editHome) TileEditor(state, pl, cols, rows)
+                if (state.editHome) {
+                    TileEditor(
+                        state, pl, cols, rows,
+                        dragModifier = Modifier.pointerInput(pl.type, page) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    dragging = pl.type
+                                    dragOffset = Offset.Zero
+                                },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount
+                                },
+                                onDragEnd = {
+                                    // case visée = centre de la tuile déplacée
+                                    val cx = pl.col + pl.w / 2f + dragOffset.x / cwPx
+                                    val cy = pl.row + pl.h / 2f + dragOffset.y / chPx
+                                    val target = page.firstOrNull {
+                                        it.type != pl.type && cx >= it.col && cx < it.col + it.w && cy >= it.row && cy < it.row + it.h
+                                    }
+                                    if (target != null) state.moveCardTo(pl.type, target.type)
+                                    dragging = null
+                                    dragOffset = Offset.Zero
+                                },
+                                onDragCancel = {
+                                    dragging = null
+                                    dragOffset = Offset.Zero
+                                },
+                            )
+                        },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun TileEditor(state: AppState, pl: Placed, cols: Int, rows: Int) {
+private fun TileEditor(state: AppState, pl: Placed, cols: Int, rows: Int, dragModifier: Modifier) {
     val pf = state.prefs
     val accent = MaterialTheme.colorScheme.primary
     val (w, h) = pf.cardSize(pl.type)
@@ -232,26 +334,30 @@ private fun TileEditor(state: AppState, pl: Placed, cols: Int, rows: Int) {
             .fillMaxSize()
             .clip(RoundedCornerShape(28.dp))
             .background(Color.Black.copy(alpha = 0.62f))
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { },
+            .then(dragModifier),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(pl.type.label, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Text("${pl.w} × ${pl.h}", color = accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Btn("◀") { state.moveCard(pl.type, -1) }
-                Btn("▶") { state.moveCard(pl.type, 1) }
-            }
+            Text("✥ glisse pour déplacer · ${pl.w} × ${pl.h}", color = accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Btn("↔ −") { pf.setCardSize(pl.type, (w - 1).coerceAtLeast(1), h) }
                 Btn("↔ +") { pf.setCardSize(pl.type, (w + 1).coerceAtMost(cols), h) }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Btn("↕ −") { pf.setCardSize(pl.type, w, (h - 1).coerceAtLeast(1)) }
                 Btn("↕ +") { pf.setCardSize(pl.type, w, (h + 1).coerceAtMost(rows)) }
             }
-            Btn("✕ Retirer") { pf.setCardEnabled(pl.type, false) }
         }
+        // gros bouton de suppression dans le coin
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(DANGER)
+                .clickable { pf.setCardEnabled(pl.type, false) },
+            contentAlignment = Alignment.Center,
+        ) { Text("✕", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -269,5 +375,6 @@ fun AnyCard(state: AppState, type: CardType, modifier: Modifier, onRequestPermis
         CardType.MESSAGES -> MessagesCard(state, modifier)
         CardType.CONTACTS -> ContactsCard(state, modifier)
         CardType.APPS -> AppsCard(state, modifier)
+        CardType.YOUTUBE -> YouTubeCard(state, modifier)
     }
 }

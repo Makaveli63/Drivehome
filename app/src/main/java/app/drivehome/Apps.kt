@@ -47,6 +47,38 @@ object Apps {
         "com.android.contacts",
     )
 
+    val YOUTUBE_PKGS = listOf(
+        "com.google.android.youtube",
+        "app.revanced.android.youtube",
+        "app.rvx.android.youtube",
+        "com.vanced.android.youtube",
+        "org.schabi.newpipe",
+        "com.liskovsoft.smarttubetv.beta",
+        "com.teamsmart.videomanager.tv",
+    )
+
+    /** Ouvre une page YouTube (recherche, abonnements…) dans l'appli YouTube installée. */
+    fun openYouTube(context: Context, ytPkg: String?, url: String) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (ytPkg != null) intent.setPackage(ytPkg)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            intent.setPackage(null)
+            safeStart(context, intent)
+        }
+    }
+
+    fun searchYouTube(context: Context, ytPkg: String?, query: String) {
+        val search = Intent(Intent.ACTION_SEARCH).putExtra("query", query).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (ytPkg != null) search.setPackage(ytPkg)
+        try {
+            context.startActivity(search)
+        } catch (e: Exception) {
+            openYouTube(context, ytPkg, "https://www.youtube.com/results?search_query=" + Uri.encode(query))
+        }
+    }
+
     fun load(context: Context): List<AppItem> {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)

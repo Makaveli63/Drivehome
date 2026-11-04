@@ -113,8 +113,10 @@ fun DrawerScreen(state: AppState) {
                                 )
                             },
                             onClick = {
+                                val adding = app.pkg !in favorites
                                 state.toggleFavorite(app.pkg)
                                 menuFor = null
+                                Apps.toast(ctx, if (adding) "${app.label} ajouté au dock" else "${app.label} retiré du dock")
                             },
                         )
                         DropdownMenuItem(
