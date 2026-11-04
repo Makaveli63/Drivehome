@@ -556,7 +556,6 @@ fun Dock(state: AppState, vertical: Boolean) {
         DockManagerDialog(state) { addDialog = false }
     }
 }
-}
 
 /** Petite silhouette de voiture (point orange si un ouvrant est ouvert). */
 @Composable
