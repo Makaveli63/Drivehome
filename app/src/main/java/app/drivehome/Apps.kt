@@ -121,6 +121,34 @@ object Apps {
     }
 
     /** Recherche à proximité (station, parking…) dans l'appli de navigation. */
+    /**
+     * Ouvre une appli dans une fenêtre aux dimensions données (fenêtres libres Android).
+     * Si l'autoradio ne gère pas les fenêtres libres, l'appli s'ouvre en plein écran.
+     */
+    fun launchInBounds(context: Context, pkg: String, bounds: android.graphics.Rect) {
+        val intent = context.packageManager.getLaunchIntentForPackage(pkg)
+        if (intent == null) {
+            toast(context, "Application introuvable")
+            return
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opts = android.app.ActivityOptions.makeBasic()
+        opts.setLaunchBounds(bounds)
+        try {
+            // WINDOWING_MODE_FREEFORM = 5 (API cachée, ignorée si indisponible)
+            android.app.ActivityOptions::class.java
+                .getMethod("setLaunchWindowingMode", Int::class.javaPrimitiveType)
+                .invoke(opts, 5)
+        } catch (e: Throwable) {
+            // pas de mode fenêtre : lancement normal
+        }
+        try {
+            context.startActivity(intent, opts.toBundle())
+        } catch (e: Exception) {
+            launch(context, pkg)
+        }
+    }
+
     fun searchNearby(context: Context, navPkg: String?, query: String) {
         val uri = if (navPkg == "com.waze") {
             Uri.parse("waze://?q=${Uri.encode(query)}")

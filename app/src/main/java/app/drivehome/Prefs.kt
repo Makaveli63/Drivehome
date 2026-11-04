@@ -263,6 +263,10 @@ class Prefs(context: Context) {
     var homeAddr by StrPref("homeAddr", "")
     /** Carte OpenStreetMap en direct dans la tuile Navigation. */
     var liveMap by BoolPref("liveMap", true)
+    /** Tracer l'itinéraire sur la carte quand un trajet est lancé depuis DriveHome. */
+    var drawRoute by BoolPref("drawRoute", true)
+    /** Ouvrir l'appli de navigation dans le cadre de la carte (fenêtre libre). */
+    var navInTile by BoolPref("navInTile", false)
     var workAddr by StrPref("workAddr", "")
     private var placesRaw by StrPref("places", "")
 

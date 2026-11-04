@@ -35,6 +35,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,11 +65,25 @@ private fun MapPanel(state: AppState, modifier: Modifier) {
     val pf = state.prefs
     val nav = NotifStore.nav
     val navPkg = nav?.pkg ?: state.navPackage()
+    val ctx = LocalContext.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    var bounds by remember { mutableStateOf(android.graphics.Rect()) }
     Box(
         modifier
             .clip(RoundedCornerShape(26.dp))
             .background(p.card)
-            .clickable { navPkg?.let { state.launch(it) } },
+            .onGloballyPositioned { c ->
+                val loc = IntArray(2)
+                view.getLocationOnScreen(loc)
+                val pos = c.positionInWindow()
+                val l = loc[0] + pos.x.toInt()
+                val t = loc[1] + pos.y.toInt()
+                bounds = android.graphics.Rect(l, t, l + c.size.width, t + c.size.height)
+            }
+            .clickable {
+                val pkg = navPkg ?: return@clickable
+                if (pf.navInTile) Apps.launchInBounds(ctx, pkg, bounds) else state.launch(pkg)
+            },
     ) {
         LiveMap(state, Modifier.fillMaxSize(), zoom = 17.0)
 
@@ -114,6 +130,7 @@ private fun MapPanel(state: AppState, modifier: Modifier) {
             Text(
                 when {
                     nav != null && nav.sub.isNotEmpty() -> nav.sub
+                    state.route.summary() != null -> state.route.summary() ?: ""
                     nav != null -> "Guidage en cours · ${state.labelOf(nav.pkg)}"
                     else -> "Toucher la carte pour ouvrir ${state.labelOf(navPkg)}"
                 },

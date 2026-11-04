@@ -258,6 +258,22 @@ fun SettingsScreen(state: AppState, onRequestPermissions: (Array<String>) -> Uni
         // --------------------------------------------------------- Conduite
         Section("Conduite & météo") {
             SwitchRow("Carte en direct dans la tuile Navigation (OpenStreetMap)", pf.liveMap) { pf.liveMap = it }
+            SwitchRow("Tracer l'itinéraire sur la carte (trajets lancés depuis DriveHome)", pf.drawRoute) { pf.drawRoute = it }
+            SwitchRow("Ouvrir Waze / Maps dans le cadre de la carte (expérimental)", pf.navInTile) { pf.navInTile = it }
+            if (pf.navInTile) {
+                Label(
+                    "Nécessite les « fenêtres de forme libre » : Paramètres Android → À propos → touche 7 fois « Numéro de build », " +
+                        "puis Options pour les développeurs → active « Activer les fenêtres de forme libre » et « Forcer le redimensionnement " +
+                        "des activités », puis redémarre l'autoradio. Ferme Waze avant de toucher la carte.",
+                )
+                ChoiceRow("Options pour les développeurs", "Ouvrir") {
+                    try {
+                        ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    } catch (e: Exception) {
+                        Apps.openSystemSettings(ctx)
+                    }
+                }
+            }
             Label("Pendant un guidage Waze / Google Maps, la tuile affiche la prochaine manœuvre (accès aux notifications requis).")
             Label("Unité de vitesse")
             ScrollRow {

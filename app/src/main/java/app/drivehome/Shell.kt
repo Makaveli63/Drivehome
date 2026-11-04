@@ -96,6 +96,7 @@ fun Root(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
             if (night != state.autoNight) state.autoNight = night
             state.drive.tick()
             state.car.tick(state.drive.speedKmh)
+            state.drive.location?.let { state.route.checkArrival(it.latitude, it.longitude) }
             delay(1000)
         }
     }
@@ -107,6 +108,17 @@ fun Root(state: AppState, onRequestPermissions: (Array<String>) -> Unit) {
             if (ll != null) state.weather.refresh(ll.first, ll.second)
             delay(if (ll == null) 30_000L else 5 * 60_000L)
         }
+    }
+
+    // guidage terminé dans Waze / Maps : on efface aussi le tracé
+    val guiding = NotifStore.nav != null
+    var wasGuiding by remember { mutableStateOf(false) }
+    LaunchedEffect(guiding) {
+        if (wasGuiding && !guiding) {
+            delay(30_000)
+            if (NotifStore.nav == null) state.route.clear()
+        }
+        wasGuiding = guiding
     }
 
     BackHandler(enabled = state.screen != Screen.Home || state.controlCenter || state.editHome) {

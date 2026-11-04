@@ -33,6 +33,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.TilesOverlay
 import java.io.File
 
@@ -75,8 +76,11 @@ private fun positionArrow(sizePx: Int, color: Int): Bitmap {
  * Carte OpenStreetMap en direct centrée sur la position GPS (sombre la nuit).
  * Non interactive : la tuile reste cliquable par-dessus.
  */
+private class MapHolder(val marker: Marker, val line: Polyline, var routeRef: List<GeoPoint>? = null)
+
 @Composable
 fun LiveMap(state: AppState, modifier: Modifier, zoom: Double = 16.5) {
+    val route = state.route.points
     val night = state.isNight()
     val loc = state.drive.location
     val fallback = state.drive.bestLatLon()
@@ -97,13 +101,21 @@ fun LiveMap(state: AppState, modifier: Modifier, zoom: Double = 16.5) {
                 zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                 isTilesScaledToDpi = true
                 controller.setZoom(zoom)
+                val line = Polyline(this).apply {
+                    outlinePaint.color = android.graphics.Color.rgb(108, 70, 235)
+                    outlinePaint.strokeWidth = 14f
+                    outlinePaint.strokeCap = Paint.Cap.ROUND
+                    outlinePaint.strokeJoin = Paint.Join.ROUND
+                    setInfoWindow(null)
+                }
+                overlays.add(line)
                 val marker = Marker(this).apply {
                     icon = android.graphics.drawable.BitmapDrawable(c.resources, positionArrow(72, android.graphics.Color.rgb(10, 132, 255)))
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     setInfoWindow(null)
                 }
                 overlays.add(marker)
-                tag = marker
+                tag = MapHolder(marker, line)
                 onResume()
             }
         },
@@ -114,7 +126,12 @@ fun LiveMap(state: AppState, modifier: Modifier, zoom: Double = 16.5) {
                 fallback != null -> GeoPoint(fallback.first, fallback.second)
                 else -> null
             }
-            val marker = mv.tag as? Marker
+            val holder = mv.tag as? MapHolder
+            val marker = holder?.marker
+            if (holder != null && holder.routeRef !== route) {
+                holder.routeRef = route
+                holder.line.setPoints(route)
+            }
             if (gp != null) {
                 mv.controller.setCenter(gp)
                 marker?.position = gp

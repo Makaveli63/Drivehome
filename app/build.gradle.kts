@@ -12,8 +12,8 @@ android {
         applicationId = "app.drivehome"
         minSdk = 24
         targetSdk = 34
-        versionCode = 7
-        versionName = "2.5"
+        versionCode = 8
+        versionName = "2.6"
     }
 
     // Clé de signature fixe (optionnelle) fournie par les secrets GitHub :

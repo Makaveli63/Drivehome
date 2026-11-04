@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import java.util.Calendar
+import kotlinx.coroutines.launch
 
 enum class Screen { Home, Car, Drawer, Phone, Messages, Settings }
 
@@ -25,6 +26,8 @@ class AppState(context: Context) {
     val weather = WeatherRepo(prefs)
     val voice = Voice(appContext)
     val car = CarManager(appContext, prefs)
+    val route = RouteRepo()
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
 
     var apps by mutableStateOf<List<AppItem>>(emptyList())
         private set
@@ -149,6 +152,11 @@ class AppState(context: Context) {
 
     fun navigateTo(address: String) {
         Apps.startNavigation(appContext, navPackage(), address)
+        // tracé de l'itinéraire sur la carte de DriveHome
+        val ll = drive.location?.let { it.latitude to it.longitude } ?: drive.bestLatLon()
+        if (ll != null && prefs.drawRoute) {
+            scope.launch { route.plan(ll.first, ll.second, address) }
+        }
     }
 
     fun toggleFavorite(pkg: String) {
